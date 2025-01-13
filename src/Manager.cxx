@@ -1,19 +1,20 @@
-#include "Trees/Manager.hxx"
 
-Manager* Manager::Instance = nullptr;
+#include "Analysis/Manager.hxx"
+
+AnalysisManager* AnalysisManager::Instance = nullptr;
 
 /*
- * Get Trees Shepherd instance
+ * Get AnalysisManager singleton instance
  */
-Manager* Manager::GetManager() {
-    if (Instance == nullptr) Instance = new Manager;
+AnalysisManager* AnalysisManager::GetInstance() {
+    if (Instance == nullptr) Instance = new AnalysisManager();
     return Instance;
 }
 
 /*
- * Delete Trees Shepherd instance
+ * Delete AnalysisManager singleton instance
  */
-void Manager::DeleteManager() {
+void AnalysisManager::DeleteInstance() {
     if (Instance != nullptr) {
         delete Instance;
         Instance = nullptr;
@@ -23,9 +24,12 @@ void Manager::DeleteManager() {
 /*
  * Default private constructor
  */
-Manager::Manager()
-    : fTree_Events(nullptr),  //
-      Event() {
+AnalysisManager::AnalysisManager()
+    : Reader(),  //
+      fInputFile(nullptr),
+      Event_UID(""),
+      Event_Dir(nullptr) {
+    // replace previous instance by this one
     if (Instance) delete Instance;
     Instance = this;
 }
@@ -33,45 +37,116 @@ Manager::Manager()
 /*
  * Private destructor
  */
-Manager::~Manager() {
-    if (fTree_Events) delete fTree_Events;
-    fTree_Events = nullptr;
-    Instance = nullptr;
+AnalysisManager::~AnalysisManager() { Instance = nullptr; }
+
+/*
+ *
+ */
+Bool_t AnalysisManager::Configure(Int_t argc, char* argv[]) {
+    // Parser* ThisParser = new Parser();
+    // IsMC = ThisParser->IsMC();
+    InfoF("IsMC          = %i", (Int_t)fIsMC);
+    InfoF("InputFile_Path = %s", fInputFile_Path.Data());
+    InfoF("LimitToNEvents = %u", fLimitToNEvents);
+    return kTRUE;
 }
 
 /*
  *
  */
-void Manager::Speak(Int_t a) {
+Bool_t AnalysisManager::OpenInputFile() {
     //
-    InfoF("What's up? %i", a);
+    fInputFile = TFile::Open(fInputFile_Path, "READ");
+    if (!fInputFile || fInputFile->IsZombie()) {
+        ErrorF("TFile %s couldn't be opened", fInputFile_Path.Data());
+        return kFALSE;
+    }
+    DebugF("TFile %s opened successfully", fInputFile_Path.Data());
+
+    TTree* EventsTree = FindTreeIn(fInputFile, "Events");
+    if (!EventsTree) return kFALSE;
+
+    SetEventsTree(EventsTree);
+    ConnectEventBranches(IsMC());
+
+    return kTRUE;
 }
 
-void Manager::ConnectEventBranches() {
-    fTree_Events->SetBranchAddress("RunNumber", &Event.RunNumber);
-    fTree_Events->SetBranchAddress("DirNumber", &Event.DirNumber);
-    // if (!IsMC) fTree_Events->SetBranchAddress("DirNumberB", &Event.DirNumberB); // PENDING
-    fTree_Events->SetBranchAddress("EventNumber", &Event.EventNumber);
-    fTree_Events->SetBranchAddress("Centrality", &Event.Centrality);
-    fTree_Events->SetBranchAddress("PV_TrueXv", &Event.PV_TrueXv);
-    fTree_Events->SetBranchAddress("PV_TrueYv", &Event.PV_TrueYv);
-    fTree_Events->SetBranchAddress("PV_TrueZv", &Event.PV_TrueZv);
-    fTree_Events->SetBranchAddress("IsGenPileup", &Event.IsGenPileup);
-    fTree_Events->SetBranchAddress("IsSBCPileup", &Event.IsSBCPileup);
-    fTree_Events->SetBranchAddress("PV_RecXv", &Event.PV_RecXv);
-    fTree_Events->SetBranchAddress("PV_RecYv", &Event.PV_RecYv);
-    fTree_Events->SetBranchAddress("PV_RecZv", &Event.PV_RecZv);
-    fTree_Events->SetBranchAddress("PV_NContributors", &Event.PV_NContributors);
-    fTree_Events->SetBranchAddress("PV_ZvErr_FromSPD", &Event.PV_ZvErr_FromSPD);
-    fTree_Events->SetBranchAddress("PV_ZvErr_FromTracks", &Event.PV_ZvErr_FromTracks);
-    fTree_Events->SetBranchAddress("PV_Zv_FromSPD", &Event.PV_Zv_FromSPD);
-    fTree_Events->SetBranchAddress("PV_Zv_FromTracks", &Event.PV_Zv_FromTracks);
-    fTree_Events->SetBranchAddress("PV_Dispersion", &Event.PV_Dispersion);
-    fTree_Events->SetBranchAddress("NTracks", &Event.NTracks);
-    fTree_Events->SetBranchAddress("NTPCClusters", &Event.NTPCClusters);
-    fTree_Events->SetBranchAddress("IsMB", &Event.IsMB);
-    fTree_Events->SetBranchAddress("IsHighMultV0", &Event.IsHighMultV0);
-    fTree_Events->SetBranchAddress("IsHighMultSPD", &Event.IsHighMultSPD);
-    fTree_Events->SetBranchAddress("IsCentral", &Event.IsCentral);
-    fTree_Events->SetBranchAddress("IsSemiCentral", &Event.IsSemiCentral);
+/*
+ *
+ */
+Bool_t AnalysisManager::GetEvent(UInt_t evt_idx) {
+    //
+    if (!ReadEvent(evt_idx)) {
+        DebugF("Event # %u couldn't be read, moving on...", evt_idx);
+        return kFALSE;
+    }
+    Event_UID = TString::Format("A18_%i_%04u_%03u", Event.RunNumber, Event.EventNumber, Event.DirNumber);
+    InfoF("Processing Event # %u (UID = %s)", evt_idx, Event_UID.Data());
+
+    Event_Dir = fInputFile->Get<TDirectoryFile>(Event_UID);
+    if (!Event_Dir) {
+        DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
+        return kFALSE;
+    }
+
+    return kTRUE;
+}
+
+/*
+ *
+ */
+void AnalysisManager::ProcessInjected() {
+    //
+    TTree* InjectedTree = FindTreeIn(Event_Dir, "Injected");
+    if (!InjectedTree) return;
+
+    SetInjectedTree(InjectedTree);
+    ConnectInjectedBranches();
+
+    for (UInt_t sexa_idx = 0; sexa_idx < GetN_Injected(); sexa_idx++) {
+        if (!ReadInjected(sexa_idx)) continue;
+        InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
+    }
+
+    DisconnectInjectedBranches();
+}
+
+/*
+ *
+ */
+void AnalysisManager::ProcessMCParticles() {
+    //
+    TTree* MCTree = FindTreeIn(Event_Dir, "MC");
+    if (!MCTree) return;
+
+    SetMCTree(MCTree);
+    ConnectMCBranches();
+
+    for (UInt_t mc_idx = 0; mc_idx < GetN_MCParticles(); mc_idx++) {
+        if (!ReadMCParticle(mc_idx)) continue;
+        if (MC.Generator != 2 || MC.Idx_Ancestor != -1) continue;
+        InfoF("%i, %i, %i, %i, %i", MC.Idx, MC.Idx_Mother, MC.Idx_Ancestor, MC.PdgCode, MC.ReactionID);
+    }
+
+    DisconnectMCBranches();
+}
+
+/*
+ *
+ */
+void AnalysisManager::ProcessTracks() {
+    //
+    TTree* TracksTree = FindTreeIn(Event_Dir, "Tracks");
+    if (!TracksTree) return;
+
+    SetTracksTree(TracksTree);
+    ConnectTracksBranches();
+
+    for (UInt_t track_idx = 0; track_idx < GetN_Tracks(); track_idx++) {
+        if (!ReadTrack(track_idx)) continue;
+        InfoF("%i, %f, %f, %f", Track.Idx, Track.Px, Track.Py, Track.Pz);
+    }
+
+    DisconnectTracksBranches();
 }

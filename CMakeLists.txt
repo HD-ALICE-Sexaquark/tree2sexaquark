@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF) # ensure -std=c++xx instead of -std=g++xx
 set_property(GLOBAL PROPERTY USE_FOLDERS ON) # support folders in IDEs
 
 # dependencies
-find_package(ROOT 6.32 CONFIG REQUIRED)
+find_package(ROOT 6.32 CONFIG REQUIRED COMPONENTS Core RIO Tree)
 
 add_subdirectory(src) # compiled library code
 add_subdirectory(apps) # executable code

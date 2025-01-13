@@ -1,5 +1,5 @@
-#ifndef T2S_UTILITIES_LOGGER_HXX
-#define T2S_UTILITIES_LOGGER_HXX
+#ifndef UTILITIES_LOGGER_HXX
+#define UTILITIES_LOGGER_HXX
 
 #include <cstdlib>
 #include <fstream>
@@ -17,8 +17,8 @@ class Logger {
    public:
     enum EType_t { kError = 0, kWarning, kInfo, kDebug, kMaxType };
     static void Message(UInt_t level, const char* message, const char* function, const char* file, Int_t line);
-    static Logger* GetLogger();
-    static void DeleteLogger();
+    static Logger* GetInstance();
+    static void DeleteInstance();
 
    private:
     Logger();
@@ -66,4 +66,4 @@ inline const char* MethodName(const std::string& prettyFunction) {
 #define InfoF(message, ...) MessageF(Logger::kInfo, message, __VA_ARGS__)
 #define DebugF(message, ...) MessageF(Logger::kDebug, message, __VA_ARGS__)
 
-#endif  // T2S_UTILITIES_LOGGER_HXX
+#endif  // UTILITIES_LOGGER_HXX

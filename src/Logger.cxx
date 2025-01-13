@@ -9,17 +9,17 @@ Logger* Logger::Instance = NULL;
 Bool_t Logger::DebugEnabled = kTRUE;
 
 /*
- * Get logger singleton instance
+ * Get Logger singleton instance
  */
-Logger* Logger::GetLogger() {
+Logger* Logger::GetInstance() {
     if (Instance == NULL) Instance = new Logger;
     return Instance;
 }
 
 /*
- * Delete logger singleton instance
+ * Delete Logger singleton instance
  */
-void Logger::DeleteLogger() {
+void Logger::DeleteInstance() {
     if (Instance != NULL) {
         delete Instance;
         Instance = NULL;
