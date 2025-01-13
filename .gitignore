@@ -1,2 +1,5 @@
 **/.cache
+**/.vscode
 *build*
+**/compile_commands.json
+**/set_env.sh
