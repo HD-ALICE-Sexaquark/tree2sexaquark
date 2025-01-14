@@ -9,20 +9,20 @@
 
 class AnalysisManager : public Reader {
    public:
-    static AnalysisManager* GetInstance();
-    static void DeleteInstance();
-    static AnalysisManager* Init() { return GetInstance(); }
+    AnalysisManager();
+    AnalysisManager(TString InputFile_Path, Bool_t IsMC, Long64_t LimitToNEvents);
+    ~AnalysisManager() = default;
 
-    Bool_t Configure(Int_t argc, char* argv[]);
+    void Print();
     Bool_t IsMC() { return fIsMC; }
 
     Bool_t OpenInputFile();
 
-    UInt_t GetN_Events() {
+    Long64_t GetN_Events() {
         if (!fLimitToNEvents) return GetEventsTree()->GetEntries();
         return fLimitToNEvents;
     }
-    Bool_t GetEvent(UInt_t evt_idx);
+    Bool_t GetEvent(Long64_t evt_idx);
 
     TTree* FindTreeIn(TFile* InputFile, TString tree_name) {
         TTree* AuxTree = InputFile->Get<TTree>(tree_name);
@@ -49,19 +49,14 @@ class AnalysisManager : public Reader {
     void ProcessTracks();
 
    private:
-    AnalysisManager();
-    virtual ~AnalysisManager();
-    static AnalysisManager* Instance;
-
     /* Analysis Properties */
-    Bool_t fIsMC = kTRUE;
-    UInt_t fLimitToNEvents = 5;
+    TString fInputFile_Path;
+    Bool_t fIsMC;
+    Long64_t fLimitToNEvents;
 
     /* -- File */
-    TString fInputFile_Path = "/home/ceres/borquez/some/esd2tree/task/attempts/local_signalMC_A1.8_18qr_test/SimpleTrees.root";
     TFile* fInputFile;
-
-    /* Event */
+    /* -- Event */
     TString Event_UID;
     TDirectoryFile* Event_Dir;
 };
