@@ -112,7 +112,7 @@ void Reader::ConnectTracksBranches() {
     // fTree_Tracks->SetBranchAddress("CovMatrix", &Track.CovMatrix[15]);
     // fTree_Tracks->SetBranchAddress("NSigmaPion", &Track.NSigmaPion);
     // fTree_Tracks->SetBranchAddress("NSigmaKaon", &Track.NSigmaKaon);
-    // fTree_Tracks->SetBranchAddress("NSigmaProton", &Track.NSigmaProton);
+    fTree_Tracks->SetBranchAddress("NSigmaProton", &Track.NSigmaProton);
     // fTree_Tracks->SetBranchAddress("DCAxy", &Track.DCAxy);
     // fTree_Tracks->SetBranchAddress("DCAz", &Track.DCAz);
     // fTree_Tracks->SetBranchAddress("NTPCClusters", &Track.NTPCClusters);
@@ -121,5 +121,5 @@ void Reader::ConnectTracksBranches() {
     // fTree_Tracks->SetBranchAddress("NSharedClusters", &Track.NSharedClusters);
     // fTree_Tracks->SetBranchAddress("Chi2overNcls", &Track.Chi2overNcls);
     // fTree_Tracks->SetBranchAddress("IsKinkDaughter", &Track.IsKinkDaughter);
-    // fTree_Tracks->SetBranchAddress("Idx_True", &Track.Idx_True);
+    fTree_Tracks->SetBranchAddress("Idx_True", &Track.Idx_True);
 }

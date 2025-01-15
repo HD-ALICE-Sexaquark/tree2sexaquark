@@ -14,14 +14,16 @@ int main(int argc, char *argv[]) {
     ThisAnalysis->Print();
     if (!ThisAnalysis->OpenInputFile()) return 1;
 
-    for (Long64_t evt_idx = 0; evt_idx < ThisAnalysis->GetN_Events(); evt_idx++) {
-        if (!ThisAnalysis->GetEvent(evt_idx)) continue;
+    for (Long64_t evt_entry = 0; evt_entry < ThisAnalysis->GetN_Events(); evt_entry++) {
+        if (!ThisAnalysis->GetEvent(evt_entry)) continue;
         if (ThisAnalysis->IsMC()) {
             ThisAnalysis->ProcessInjected();
             ThisAnalysis->ProcessMCParticles();
         }
         ThisAnalysis->ProcessTracks();
+        ThisAnalysis->EndOfEvent();
     }
+    ThisAnalysis->EndOfAnalysis();
 
     return 0;
 }

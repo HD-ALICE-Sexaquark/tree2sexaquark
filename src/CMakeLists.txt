@@ -13,7 +13,7 @@ target_include_directories(Manager PUBLIC ../include)
 target_link_libraries(Parser PUBLIC)
 target_link_libraries(Logger PUBLIC ROOT::Core)
 target_link_libraries(Reader PUBLIC ROOT::Core ROOT::RIO ROOT::Tree Logger)
-target_link_libraries(Manager PUBLIC Reader)
+target_link_libraries(Manager PUBLIC ROOT::EG Reader)
 
 target_compile_features(Parser PUBLIC cxx_std_11)
 target_compile_features(Logger PUBLIC cxx_std_11)

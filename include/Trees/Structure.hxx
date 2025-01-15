@@ -96,7 +96,7 @@ struct Track_tt {
     // Float_t CovMatrix[15];  // covariance matrix
     // Float_t NSigmaPion;     //
     // Float_t NSigmaKaon;     //
-    // Float_t NSigmaProton;   //
+    Float_t NSigmaProton;  //
     // Float_t DCAxy;          // pre-calculated DCA wrt PV
     // Float_t DCAz;           // pre-calculated DCA wrt PV
     // UShort_t NTPCClusters;       //
@@ -108,7 +108,7 @@ struct Track_tt {
     // TBits TPCFitMap;             //
     // TBits TPCClusterMap;         //
     // TBits TPCSharedMap;          //
-    // Int_t Idx_True;  //
+    Int_t Idx_True;  //
 };
 
 #endif  // T2S_TREES_STRUCTURE_HXX
