@@ -25,11 +25,15 @@ AnalysisManager::AnalysisManager(TString InputFile_Path, Bool_t IsMC, Long64_t L
       getAncestorMcIdx_fromMcIdx(),
       getNegDauMcIdx_fromMcIdx(),
       getPosDauMcIdx_fromMcIdx(),
+      /*  */
+      getTrackEntry_fromEsdIdx(),
       getMcIdx_fromEsdIdx(),
-      getEsdIndices_fromReactionID(),
+      /*  */
       mcIndicesOfTrueV0s(),
       getNegDauEsdIdx_fromMcIdx(),
-      getPosDauEsdIdx_fromMcIdx() {}
+      getPosDauEsdIdx_fromMcIdx(),
+      /*  */
+      getEsdIndices_fromReactionID() {}
 
 /*
  *
@@ -145,11 +149,26 @@ void AnalysisManager::ProcessTracks() {
     ConnectTracksBranches();
 
     Int_t True_PdgCode;
+    UInt_t MotherMcIdx;
+    UInt_t Aux_McIdx;
+    UInt_t ReactionID;
 
     for (Long64_t track_entry = 0; track_entry < GetN_Tracks(); track_entry++) {
         if (!ReadTrack(track_entry)) continue;
         /* Fill containers */
+        getTrackEntry_fromEsdIdx[Track.Idx] = track_entry;
         getMcIdx_fromEsdIdx[Track.Idx] = Track.Idx_True;
+        if (GetMotherMcIdx(Track.Idx_True, MotherMcIdx)) {
+            if (GetNegDauMcIdx(MotherMcIdx, Aux_McIdx)) {
+                if (Aux_McIdx == Track.Idx_True) getNegDauEsdIdx_fromMcIdx[MotherMcIdx] = Track.Idx;
+            }
+            if (GetPosDauMcIdx(MotherMcIdx, Aux_McIdx)) {
+                if (Aux_McIdx == Track.Idx_True) getPosDauEsdIdx_fromMcIdx[MotherMcIdx] = Track.Idx;
+            }
+        }
+        if (GetReactionID(Track.Idx_True, ReactionID)) {
+            getEsdIndices_fromReactionID[ReactionID].push_back(Track.Idx);
+        }
         /*  */
         if (!GetPdgCode(Track.Idx_True, True_PdgCode)) continue;
         if (True_PdgCode != 2212) continue;
@@ -158,10 +177,30 @@ void AnalysisManager::ProcessTracks() {
 }
 
 /*
- *
+ * Find all true (primary, secondary, signal) V0s for which both of their daughters were reconstructed and passed track selection
  */
 void AnalysisManager::ProcessFindableV0s() {
     //
+    Int_t V0_PdgCode;
+    UInt_t Neg_McIdx, Pos_McIdx;
+    Int_t Neg_PdgCode, Pos_PdgCode;
+    UInt_t Neg_EsdIdx, Pos_EsdIdx;
+
+    for (UInt_t& V0_McIdx : mcIndicesOfTrueV0s) {
+        //
+        if (!GetPdgCode(V0_McIdx, V0_PdgCode)) continue;
+        if (!GetNegDauMcIdx(V0_McIdx, Neg_McIdx)) continue;
+        if (!GetPosDauMcIdx(V0_McIdx, Pos_McIdx)) continue;
+        if (!GetPdgCode(Neg_McIdx, Neg_PdgCode)) continue;
+        if (!GetPdgCode(Pos_McIdx, Pos_PdgCode)) continue;
+        if (!GetNegDauEsdIdx(V0_McIdx, Neg_EsdIdx)) continue;
+        if (!GetPosDauEsdIdx(V0_McIdx, Pos_EsdIdx)) continue;
+        //
+        InfoF("mom: %u, %i, %i, neg: %u, %i, %u, pos: %u, %i, %u",  //
+              V0_McIdx, V0_PdgCode, (Int_t)IsSignal(V0_McIdx),      //
+              Neg_McIdx, Neg_PdgCode, Neg_EsdIdx,                   //
+              Pos_McIdx, Pos_PdgCode, Pos_EsdIdx);
+    }
 }
 
 /*
@@ -169,6 +208,35 @@ void AnalysisManager::ProcessFindableV0s() {
  */
 void AnalysisManager::ProcessFindableSexaquarks() {
     //
+    Int_t PdgCode_StruckNucleon = 2112;
+    std::vector<Int_t> PdgCodes_FinalStateProducts = {-2212, 211, -211, 211};
+
+    Long64_t track_entry;
+    Int_t pdg_code;
+
+    for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
+        if (!ReadInjected(sexa_entry)) continue;
+
+        /* All final state products should have been reconstructed and passed track selection */
+
+        std::unordered_multiset<Int_t> pdg_reconstructed_particles;
+        for (UInt_t& EsdIdx : getEsdIndices_fromReactionID[Injected.ReactionID]) {
+            pdg_reconstructed_particles.insert(getPdgCode_fromMcIdx[getMcIdx_fromEsdIdx[EsdIdx]]);
+        }
+
+        std::unordered_multiset<Int_t> expected_pdg_fs_particles(PdgCodes_FinalStateProducts.begin(), PdgCodes_FinalStateProducts.end());
+
+        if (expected_pdg_fs_particles != pdg_reconstructed_particles) continue;
+
+        /** Loop, to get the reconstructed final-state particles info **/
+
+        for (UInt_t& EsdIdx : getEsdIndices_fromReactionID[Injected.ReactionID]) {
+            if (!GetTrackEntry(EsdIdx, track_entry)) continue;
+            ReadTrack(track_entry);
+            if (!GetPdgCode(Track.Idx_True, pdg_code)) continue;
+            InfoF("%i, %u, %u, %i, %f, %f, %f", Injected.ReactionID, EsdIdx, Track.Idx_True, pdg_code, Track.Px, Track.Py, Track.Pz);
+        }
+    }
 }
 
 /*               */
@@ -191,6 +259,7 @@ void AnalysisManager::CleanContainers() {
     getNegDauMcIdx_fromMcIdx.clear();
     getPosDauMcIdx_fromMcIdx.clear();
     //
+    getTrackEntry_fromEsdIdx.clear();
     getMcIdx_fromEsdIdx.clear();
     //
     getEsdIndices_fromReactionID.clear();

@@ -20,7 +20,14 @@ int main(int argc, char *argv[]) {
             ThisAnalysis->ProcessInjected();
             ThisAnalysis->ProcessMCParticles();
         }
+        /* Tracks */
         ThisAnalysis->ProcessTracks();
+        /* Findables */
+        if (ThisAnalysis->IsMC()) {
+            ThisAnalysis->ProcessFindableV0s();
+            ThisAnalysis->ProcessFindableSexaquarks();
+        }
+        /* End of Event */
         ThisAnalysis->EndOfEvent();
     }
     ThisAnalysis->EndOfAnalysis();

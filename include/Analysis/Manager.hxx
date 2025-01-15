@@ -2,6 +2,8 @@
 #define T2S_ANALYSIS_MANAGER_HXX
 
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "TDatabasePDG.h"
 #include "TDirectoryFile.h"
@@ -57,7 +59,6 @@ class AnalysisManager : public Reader {
 
     /* V0s */
     void ProcessFindableV0s();
-    Int_t GetN_TrueV0s() { return (Int_t)mcIndicesOfTrueV0s.size(); }
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
@@ -84,6 +85,7 @@ class AnalysisManager : public Reader {
     }
     Bool_t GetReactionID(UInt_t mcIdx, UInt_t& reactionID) {
         if (getReactionID_fromMcIdx.find(mcIdx) == getReactionID_fromMcIdx.end()) return kFALSE;
+        if (getReactionID_fromMcIdx[mcIdx] == -1) return kFALSE;
         reactionID = getReactionID_fromMcIdx[mcIdx];
         return kTRUE;
     }
@@ -115,9 +117,25 @@ class AnalysisManager : public Reader {
         return kTRUE;
     }
     /* -- filled at `ProcessTracks()` */
+    Bool_t GetTrackEntry(UInt_t esdIdx, Long64_t& trackEntry) {
+        if (getTrackEntry_fromEsdIdx.find(esdIdx) == getTrackEntry_fromEsdIdx.end()) return kFALSE;
+        trackEntry = getTrackEntry_fromEsdIdx[esdIdx];
+        return kTRUE;
+    }
     Bool_t GetMcIdx(UInt_t esdIdx, Int_t& mcIdx) {
         if (getMcIdx_fromEsdIdx.find(esdIdx) == getMcIdx_fromEsdIdx.end()) return kFALSE;
         mcIdx = getMcIdx_fromEsdIdx[esdIdx];
+        return kTRUE;
+    }
+    /* -- used in `ProcessFindableV0s()` */
+    Bool_t GetNegDauEsdIdx(UInt_t mcIdx, UInt_t& negDauEsdIdx) {
+        if (getNegDauEsdIdx_fromMcIdx.find(mcIdx) == getNegDauEsdIdx_fromMcIdx.end()) return kFALSE;
+        negDauEsdIdx = getNegDauEsdIdx_fromMcIdx[mcIdx];
+        return kTRUE;
+    }
+    Bool_t GetPosDauEsdIdx(UInt_t mcIdx, UInt_t& posDauEsdIdx) {
+        if (getPosDauEsdIdx_fromMcIdx.find(mcIdx) == getPosDauEsdIdx_fromMcIdx.end()) return kFALSE;
+        posDauEsdIdx = getPosDauEsdIdx_fromMcIdx[mcIdx];
         return kTRUE;
     }
 
@@ -142,7 +160,7 @@ class AnalysisManager : public Reader {
 
     /* Containers */
     /* -- filled at `ProcessMCParticles()` */
-    std::unordered_map<UInt_t, Long64_t> getMcEntry_fromMcIdx;                    // key: `mcIdx`, value: get MC entry (position within the tree) from
+    std::unordered_map<UInt_t, Long64_t> getMcEntry_fromMcIdx;                    // key: `mcIdx`, value: get MC position within the tree
     std::unordered_map<UInt_t, Int_t> getPdgCode_fromMcIdx;                       // key: `mcIdx`
     std::unordered_map<UInt_t, Bool_t> isMcIdxSignal;                             // key: `mcIdx`
     std::unordered_map<UInt_t, Bool_t> isMcIdxSecondary;                          // key: `mcIdx`
@@ -153,7 +171,8 @@ class AnalysisManager : public Reader {
     std::unordered_map<UInt_t, UInt_t> getNegDauMcIdx_fromMcIdx;                  // key: `mcIdx`
     std::unordered_map<UInt_t, UInt_t> getPosDauMcIdx_fromMcIdx;                  // key: `mcIdx`
     /* -- filled at `ProcessTracks()` */
-    std::unordered_map<UInt_t, UInt_t> getMcIdx_fromEsdIdx;  // key: `esdIdx`
+    std::unordered_map<UInt_t, Long64_t> getTrackEntry_fromEsdIdx;  // key: `esdIdx`, value: get track position within the tree
+    std::unordered_map<UInt_t, UInt_t> getMcIdx_fromEsdIdx;         // key: `esdIdx`
     /* -- used in `ProcessFindableV0s()` */
     std::vector<UInt_t> mcIndicesOfTrueV0s;
     std::unordered_map<UInt_t, UInt_t> getNegDauEsdIdx_fromMcIdx;  // key: `mcIdx`
