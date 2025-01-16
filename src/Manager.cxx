@@ -1,14 +1,14 @@
+#include <unordered_set>
+
 #include "Analysis/Manager.hxx"
 
 /*
  * Default constructor (with arguments)
  */
-AnalysisManager::AnalysisManager(TString InputFile_Path, Bool_t IsMC, Long64_t LimitToNEvents)
-    : Reader(),  //
+AnalysisManager::AnalysisManager(Settings_tt Settings)  //
+    : Reader(),                                         //
       /*  */
-      fInputFile_Path(InputFile_Path),
-      fIsMC(IsMC),
-      fLimitToNEvents(LimitToNEvents),
+      Settings(Settings),
       /*  */
       fPDG(),
       fInputFile(nullptr),
@@ -40,9 +40,10 @@ AnalysisManager::AnalysisManager(TString InputFile_Path, Bool_t IsMC, Long64_t L
  */
 void AnalysisManager::Print() {
     //
-    InfoF("IsMC           = %i", (Int_t)fIsMC);
-    InfoF("InputFile_Path = %s", fInputFile_Path.Data());
-    InfoF("LimitToNEvents = %lld", fLimitToNEvents);
+    InfoF("IsMC           = %i", (Int_t)Settings.IsMC);
+    InfoF("IsSignalMC     = %i", (Int_t)Settings.IsSignalMC);
+    InfoF("InputFile_Path = %s", Settings.PathInputFile.c_str());
+    InfoF("LimitToNEvents = %lld", Settings.LimitToNEvents);
 }
 
 /*
@@ -50,12 +51,12 @@ void AnalysisManager::Print() {
  */
 Bool_t AnalysisManager::OpenInputFile() {
     //
-    fInputFile = TFile::Open(fInputFile_Path, "READ");
+    fInputFile = TFile::Open((TString)Settings.PathInputFile, "READ");
     if (!fInputFile || fInputFile->IsZombie()) {
-        ErrorF("TFile %s couldn't be opened", fInputFile_Path.Data());
+        ErrorF("TFile %s couldn't be opened", Settings.PathInputFile.c_str());
         return kFALSE;
     }
-    DebugF("TFile %s opened successfully", fInputFile_Path.Data());
+    DebugF("TFile %s opened successfully", Settings.PathInputFile.c_str());
 
     TTree* EventsTree = FindTreeIn(fInputFile, "Events");
     if (!EventsTree) return kFALSE;
@@ -100,7 +101,7 @@ void AnalysisManager::ProcessInjected() {
 
     for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
         if (!ReadInjected(sexa_entry)) continue;
-        InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
+        // InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
     }
 }
 
@@ -133,7 +134,7 @@ void AnalysisManager::ProcessMCParticles() {
         if (MC.PdgCode == 310 || TMath::Abs(MC.PdgCode) == 3122) mcIndicesOfTrueV0s.push_back(MC.Idx);
         /*  */
         if (MC.Generator != 2 || MC.Idx_Ancestor != -1) continue;
-        InfoF("%i, %i, %i, %i, %i", MC.Idx, MC.Idx_Mother, MC.Idx_Ancestor, MC.PdgCode, MC.ReactionID);
+        // InfoF("%i, %i, %i, %i, %i", MC.Idx, MC.Idx_Mother, MC.Idx_Ancestor, MC.PdgCode, MC.ReactionID);
     }
 }
 
@@ -172,7 +173,7 @@ void AnalysisManager::ProcessTracks() {
         /*  */
         if (!GetPdgCode(Track.Idx_True, True_PdgCode)) continue;
         if (True_PdgCode != 2212) continue;
-        InfoF("%i, %i, %i, %f, %f, %f, %f", Track.Idx, Track.Idx_True, True_PdgCode, Track.Px, Track.Py, Track.Pz, Track.NSigmaProton);
+        // InfoF("%i, %i, %i, %f, %f, %f, %f", Track.Idx, Track.Idx_True, True_PdgCode, Track.Px, Track.Py, Track.Pz, Track.NSigmaProton);
     }
 }
 

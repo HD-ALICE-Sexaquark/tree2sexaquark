@@ -2,7 +2,6 @@
 #define T2S_ANALYSIS_MANAGER_HXX
 
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "TDatabasePDG.h"
@@ -10,21 +9,23 @@
 #include "TFile.h"
 #include "TString.h"
 
+#include "Analysis/Settings.hxx"
 #include "Trees/Reader.hxx"
 
 class AnalysisManager : public Reader {
    public:
     AnalysisManager() = default;
-    AnalysisManager(TString InputFile_Path, Bool_t IsMC, Long64_t LimitToNEvents);
+    AnalysisManager(Settings_tt Settings);
     ~AnalysisManager() = default;
 
     void Print();
     Bool_t OpenInputFile();
-    Bool_t IsMC() { return fIsMC; }
+    Bool_t IsMC() { return Settings.IsMC; }
+    Bool_t IsSignalMC() { return Settings.IsSignalMC; }
 
     Long64_t GetN_Events() {
-        if (!fLimitToNEvents) return GetEventsTree()->GetEntries();
-        return fLimitToNEvents;
+        if (!Settings.LimitToNEvents) return GetEventsTree()->GetEntries();
+        return Settings.LimitToNEvents;
     }
     Bool_t GetEvent(Long64_t evt_idx);
 
@@ -146,9 +147,7 @@ class AnalysisManager : public Reader {
 
    private:
     /* Analysis Properties */
-    TString fInputFile_Path;
-    Bool_t fIsMC;
-    Long64_t fLimitToNEvents;
+    Settings_tt Settings;
 
     /* ROOT Objects */
     TDatabasePDG fPDG;

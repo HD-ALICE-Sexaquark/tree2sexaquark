@@ -24,9 +24,10 @@ target_compile_features(Manager PUBLIC cxx_std_11)
 source_group(
   TREE "${PROJECT_SOURCE_DIR}/include"
   FILES
-  "${PROJECT_SOURCE_DIR}/include/Utilities/CL1.hpp"
-  "${PROJECT_SOURCE_DIR}/include/Utilities/Parser.hxx"
   "${PROJECT_SOURCE_DIR}/include/Utilities/Logger.hxx"
   "${PROJECT_SOURCE_DIR}/include/Trees/Structure.hxx"
   "${PROJECT_SOURCE_DIR}/include/Trees/Reader.hxx"
+  "${PROJECT_SOURCE_DIR}/include/Analysis/Settings.hxx"
+  "${PROJECT_SOURCE_DIR}/include/Utilities/CL1.hpp"
+  "${PROJECT_SOURCE_DIR}/include/Utilities/Parser.hxx"
   "${PROJECT_SOURCE_DIR}/include/Analysis/Manager.hxx")

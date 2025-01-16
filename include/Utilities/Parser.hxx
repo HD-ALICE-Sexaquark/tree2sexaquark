@@ -3,6 +3,11 @@
 
 #include "Utilities/CL1.hpp"
 
+#include "Analysis/Settings.hxx"
+
+/*
+ *
+ */
 class Parser {
    public:
     Parser();
@@ -11,14 +16,12 @@ class Parser {
     int Parse(int argc, char* argv[]);
     int ExitCode;
     bool HelpOrError;
-
-    std::string InputFile;
-    bool IsMC;
-    int LimitToNEvents;
+    Settings_tt GetSettings() { return Settings; }
 
    private:
     void AddOptions();
     CLI::App CLI_APP;
+    Settings_tt Settings;
 };
 
 #endif  // T2S_PARSER_HXX
