@@ -11,7 +11,7 @@ AnalysisManager::AnalysisManager(Settings_tt Settings)  //
       Settings(Settings),
       /*  */
       fPDG(),
-      fInputFile(nullptr),
+      InputFile(nullptr),
       Event_UID(""),
       Event_Dir(nullptr),
       /*  */
@@ -51,39 +51,18 @@ void AnalysisManager::Print() {
  */
 Bool_t AnalysisManager::OpenInputFile() {
     //
-    fInputFile = TFile::Open((TString)Settings.PathInputFile, "READ");
-    if (!fInputFile || fInputFile->IsZombie()) {
+    InputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings.PathInputFile, "READ"));
+    if (!InputFile || InputFile->IsZombie()) {
         ErrorF("TFile %s couldn't be opened", Settings.PathInputFile.c_str());
         return kFALSE;
     }
     DebugF("TFile %s opened successfully", Settings.PathInputFile.c_str());
 
-    TTree* EventsTree = FindTreeIn(fInputFile, "Events");
+    TTree* EventsTree = FindTreeInFile("Events");
     if (!EventsTree) return kFALSE;
 
     SetEventsTree(EventsTree);
-    ConnectEventBranches(IsMC());
-
-    return kTRUE;
-}
-
-/*
- *
- */
-Bool_t AnalysisManager::GetEvent(Long64_t evt_idx) {
-    //
-    if (!ReadEvent(evt_idx)) {
-        DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
-        return kFALSE;
-    }
-    Event_UID = TString::Format("A18_%i_%04u_%03u", Event.RunNumber, Event.EventNumber, Event.DirNumber);
-    InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
-
-    Event_Dir = fInputFile->Get<TDirectoryFile>(Event_UID);
-    if (!Event_Dir) {
-        DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
-        return kFALSE;
-    }
+    ConnectEventBranches(Settings.IsMC);
 
     return kTRUE;
 }
@@ -93,7 +72,7 @@ Bool_t AnalysisManager::GetEvent(Long64_t evt_idx) {
  */
 void AnalysisManager::ProcessInjected() {
     //
-    TTree* InjectedTree = FindTreeIn(Event_Dir, "Injected");
+    TTree* InjectedTree = FindTreeInEventDir("Injected");
     if (!InjectedTree) return;
 
     SetInjectedTree(InjectedTree);
@@ -110,7 +89,7 @@ void AnalysisManager::ProcessInjected() {
  */
 void AnalysisManager::ProcessMCParticles() {
     //
-    TTree* MCTree = FindTreeIn(Event_Dir, "MC");
+    TTree* MCTree = FindTreeInEventDir("MC");
     if (!MCTree) return;
 
     SetMCTree(MCTree);
@@ -143,7 +122,7 @@ void AnalysisManager::ProcessMCParticles() {
  */
 void AnalysisManager::ProcessTracks() {
     //
-    TTree* TracksTree = FindTreeIn(Event_Dir, "Tracks");
+    TTree* TracksTree = FindTreeInEventDir("Tracks");
     if (!TracksTree) return;
 
     SetTracksTree(TracksTree);
@@ -287,6 +266,4 @@ void AnalysisManager::EndOfEvent() {
 void AnalysisManager::EndOfAnalysis() {
     //
     DisconnectEventBranches();
-    fInputFile->Close();
-    delete fInputFile;
 }

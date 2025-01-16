@@ -1,31 +1,6 @@
 #include "Trees/Reader.hxx"
 
 /*
- * Default constructor
- */
-Reader::Reader()
-    : fTree_Events(nullptr),    //
-      Event(),                  //
-      fTree_Injected(nullptr),  //
-      Injected(),
-      fTree_MC(nullptr),  //
-      MC() {
-    //
-}
-
-/*
- * Private destructor
- */
-Reader::~Reader() {
-    if (fTree_Events) delete fTree_Events;
-    fTree_Events = nullptr;
-    if (fTree_Injected) delete fTree_Injected;
-    fTree_Injected = nullptr;
-    if (fTree_MC) delete fTree_MC;
-    fTree_MC = nullptr;
-}
-
-/*
  *
  */
 void Reader::ConnectEventBranches(Bool_t IsMC) {

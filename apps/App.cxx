@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "Utilities/Logger.hxx"
 #include "Utilities/Parser.hxx"
 
@@ -6,16 +8,20 @@
 int main(int argc, char *argv[]) {
 
     Logger *LoggerInstance = Logger::GetInstance();
-    Parser *ParserInstance = new Parser("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
+    std::unique_ptr<Parser> ParserInstance =
+        std::make_unique<Parser>("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
     ParserInstance->Parse(argc, argv);
     if (ParserInstance->HelpOrError) return ParserInstance->ExitCode;
 
-    AnalysisManager *ThisAnalysis = new AnalysisManager(ParserInstance->GetSettings());
+    std::unique_ptr<AnalysisManager> ThisAnalysis = std::make_unique<AnalysisManager>(ParserInstance->GetSettings());
     ThisAnalysis->Print();
     if (!ThisAnalysis->OpenInputFile()) return 1;
 
     for (Long64_t evt_entry = 0; evt_entry < ThisAnalysis->GetN_Events(); evt_entry++) {
-        if (!ThisAnalysis->GetEvent(evt_entry)) continue;
+        if (!ThisAnalysis->GetEvent(evt_entry)) {
+            ThisAnalysis->EndOfEvent();
+            continue;
+        }
         if (ThisAnalysis->IsMC()) {
             if (ThisAnalysis->IsSignalMC()) ThisAnalysis->ProcessInjected();
             ThisAnalysis->ProcessMCParticles();
@@ -31,6 +37,8 @@ int main(int argc, char *argv[]) {
         ThisAnalysis->EndOfEvent();
     }
     ThisAnalysis->EndOfAnalysis();
+
+    Logger::DeleteInstance();
 
     return 0;
 }

@@ -1,6 +1,7 @@
 #ifndef T2S_ANALYSIS_MANAGER_HXX
 #define T2S_ANALYSIS_MANAGER_HXX
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -9,14 +10,14 @@
 #include "TFile.h"
 #include "TString.h"
 
+#include "Utilities/Logger.hxx"
+
 #include "Analysis/Settings.hxx"
 #include "Trees/Reader.hxx"
 
 class AnalysisManager : public Reader {
    public:
-    AnalysisManager() = default;
     AnalysisManager(Settings_tt Settings);
-    ~AnalysisManager() = default;
 
     void Print();
     Bool_t OpenInputFile();
@@ -27,9 +28,25 @@ class AnalysisManager : public Reader {
         if (!Settings.LimitToNEvents) return GetEventsTree()->GetEntries();
         return Settings.LimitToNEvents;
     }
-    Bool_t GetEvent(Long64_t evt_idx);
 
-    TTree* FindTreeIn(TFile* InputFile, TString tree_name) {
+    Bool_t GetEvent(Long64_t evt_idx) {
+        if (!ReadEvent(evt_idx)) {
+            DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
+            return kFALSE;
+        }
+        Event_UID = TString::Format("A18_%i_%04u_%03u", Event.RunNumber, Event.EventNumber, Event.DirNumber);
+        InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
+
+        Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
+        if (!Event_Dir) {
+            DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
+            return kFALSE;
+        }
+
+        return kTRUE;
+    }
+
+    TTree* FindTreeInFile(TString tree_name) {
         TTree* AuxTree = InputFile->Get<TTree>(tree_name);
         if (!AuxTree) {
             ErrorF("TTree %s couldn't be found in TFile %s", tree_name.Data(), InputFile->GetName());
@@ -39,13 +56,13 @@ class AnalysisManager : public Reader {
         return AuxTree;
     }
 
-    TTree* FindTreeIn(TDirectoryFile* InputDir, TString tree_name) {
-        TTree* AuxTree = InputDir->Get<TTree>(tree_name);
+    TTree* FindTreeInEventDir(TString tree_name) {
+        TTree* AuxTree = Event_Dir->Get<TTree>(tree_name);
         if (!AuxTree) {
-            ErrorF("TTree %s couldn't be found in TDirectoryFile %s", tree_name.Data(), InputDir->GetName());
+            ErrorF("TTree %s couldn't be found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
             return nullptr;
         }
-        DebugF("TTree %s found in TDirectoryFile %s", tree_name.Data(), InputDir->GetName());
+        DebugF("TTree %s found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
         return AuxTree;
     }
 
@@ -152,10 +169,10 @@ class AnalysisManager : public Reader {
     /* ROOT Objects */
     TDatabasePDG fPDG;
     /* -- File */
-    TFile* fInputFile;
+    std::unique_ptr<TFile> InputFile;
     /* -- Event */
     TString Event_UID;
-    TDirectoryFile* Event_Dir;
+    std::unique_ptr<TDirectoryFile> Event_Dir;
 
     /* Containers */
     /* -- filled at `ProcessMCParticles()` */
