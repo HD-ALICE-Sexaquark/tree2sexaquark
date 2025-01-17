@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "KFParticle.h"
+
 #include "Utilities/Logger.hxx"
 #include "Utilities/Parser.hxx"
 
@@ -8,6 +10,10 @@
 int main(int argc, char *argv[]) {
 
     Logger *LoggerInstance = Logger::GetInstance();
+
+    KFParticle *particle = new KFParticle();
+    InfoF("KFParticle in memory: %p", particle);
+
     std::unique_ptr<Parser> ParserInstance =
         std::make_unique<Parser>("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
     ParserInstance->Parse(argc, argv);
