@@ -1,27 +1,37 @@
 cmake_minimum_required(VERSION 3.15...3.31)
+project(Tree2Sexaquark LANGUAGES CXX)
 
-project(
-    Tree2Sexaquark
-    VERSION 0.1
-    DESCRIPTION "Tralala"
-    LANGUAGES CXX)
+# support folders in IDEs #
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# prevent in-source builds #
+
+if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
+  message(FATAL_ERROR "You don't want to configure in the source directory!")
+endif()
+
+# C++ standard #
 
 set(CMAKE_CXX_EXTENSIONS OFF) # ensure -std=c++xx instead of -std=g++xx
-set_property(GLOBAL PROPERTY USE_FOLDERS ON) # support folders in IDEs
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# dependencies
+# find dependencies #
+
+message(STATUS "Looking for ROOT")
 find_package(ROOT 6.32 CONFIG REQUIRED COMPONENTS Core RIO Tree EG)
+if(ROOT_FOUND)
+  message(STATUS "Looking for ROOT -- found")
+endif()
+
+message(STATUS "Looking for KFParticle")
 find_package(KFParticle CONFIG REQUIRED)
+if(KFParticle_FOUND)
+  message(STATUS "Looking for KFParticle -- found")
+endif()
 
-include(${ROOT_USE_FILE})
-set(CMAKE_INCLUDE_DIRECTORIES_BEFORE ON)
-include_directories(${CMAKE_SOURCE_DIR} ${KFParticle_INCLUDE_DIR} ${INCLUDE_DIRECTORIES})
-set(CMAKE_INCLUDE_DIRECTORIES_BEFORE OFF)
-set(LINK_DIRECTORIES ${ROOT_LIBRARY_DIR})
-link_directories(${LINK_DIRECTORIES})
+# main #
 
-ROOT_GENERATE_DICTIONARY(G__KFParticle ${HEADERS} LINKDEF KFLinkDef.h OPTIONS "-DDO_TPCCATRACKER_EFF_PERFORMANCE" "-DHomogeneousField" "-DUSE_TIMERS")
-add_library(KFParticle SHARED ${SOURCES} G__KFParticle.cxx)
-
-add_subdirectory(src) # compiled library code
-add_subdirectory(apps) # executable code
+add_subdirectory(src)
+add_subdirectory(apps)

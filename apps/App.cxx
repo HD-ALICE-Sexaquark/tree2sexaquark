@@ -13,6 +13,11 @@ int main(int argc, char *argv[]) {
 
     KFParticle *particle = new KFParticle();
     InfoF("KFParticle in memory: %p", particle);
+#ifdef HomogeneousField
+    InfoF("Homogeneous Field is defined %s", "");
+#else
+    InfoF("Homogeneous Field is not defined %s", "");
+#endif
 
     std::unique_ptr<Parser> ParserInstance =
         std::make_unique<Parser>("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
