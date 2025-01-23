@@ -1,22 +1,38 @@
-# Make an automatic library - will be static or dynamic based on user setting
-add_library(Parser Parser.cxx)
-add_library(Logger Logger.cxx)
-add_library(Reader Reader.cxx)
-add_library(Manager Manager.cxx)
+add_library(Logger STATIC Logger.cxx)
+target_include_directories(Logger
+  PUBLIC
+    ${ROOT_INCLUDE_DIRS}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+)
 
-target_include_directories(Parser PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories(Logger PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories(Reader PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories(Manager PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
+add_library(Parser STATIC Parser.cxx)
+target_include_directories(Parser
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+)
 
-target_link_libraries(Parser PUBLIC)
-target_link_libraries(Logger PUBLIC ROOT::Core)
-target_link_libraries(Reader PUBLIC ROOT::Core ROOT::RIO ROOT::Tree Logger)
-target_link_libraries(Manager PUBLIC ROOT::EG Reader)
+add_library(Reader STATIC Reader.cxx)
+target_include_directories(Reader
+  PUBLIC
+    ${ROOT_INCLUDE_DIRS}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+)
+
+add_library(KalmanFilter STATIC KalmanFilter.cxx)
+target_include_directories(KalmanFilter
+  PUBLIC
+    ${ROOT_INCLUDE_DIRS}
+    ${KFParticle_INCLUDE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+    )
+
+add_library(Manager STATIC Manager.cxx)
+target_include_directories(Manager
+  PUBLIC
+    ${ROOT_INCLUDE_DIRS}
+    ${KFParticle_INCLUDE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+)
 
 source_group(
   TREE ${PROJECT_SOURCE_DIR}/include
@@ -27,4 +43,6 @@ source_group(
     ${PROJECT_SOURCE_DIR}/include/Analysis/Settings.hxx
     ${PROJECT_SOURCE_DIR}/include/Utilities/CL1.hpp
     ${PROJECT_SOURCE_DIR}/include/Utilities/Parser.hxx
-    ${PROJECT_SOURCE_DIR}/include/Analysis/Manager.hxx)
+    ${PROJECT_SOURCE_DIR}/include/Math/KalmanFilter.hxx
+    ${PROJECT_SOURCE_DIR}/include/Analysis/Manager.hxx
+)

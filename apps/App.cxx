@@ -1,23 +1,9 @@
-#include <memory>
-
-#include "KFParticle.h"
-
-#include "Utilities/Logger.hxx"
-#include "Utilities/Parser.hxx"
-
 #include "Analysis/Manager.hxx"
+#include "Utilities/Parser.hxx"
 
 int main(int argc, char *argv[]) {
 
     Logger *LoggerInstance = Logger::GetInstance();
-
-    KFParticle *particle = new KFParticle();
-    InfoF("KFParticle in memory: %p", particle);
-#ifdef HomogeneousField
-    InfoF("Homogeneous Field is defined %s", "");
-#else
-    InfoF("Homogeneous Field is not defined %s", "");
-#endif
 
     std::unique_ptr<Parser> ParserInstance =
         std::make_unique<Parser>("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
@@ -44,6 +30,10 @@ int main(int argc, char *argv[]) {
             ThisAnalysis->ProcessFindableV0s();
             if (ThisAnalysis->IsSignalMC()) ThisAnalysis->ProcessFindableSexaquarks();
         }
+        /* V0s */
+        ThisAnalysis->KalmanV0Finder(-2212, 211, -3122);
+        // ThisAnalysis->KalmanV0Finder(-211, 2212, 3122);
+        // ThisAnalysis->KalmanV0Finder(-211, 211);
         /* End of Event */
         ThisAnalysis->EndOfEvent();
     }

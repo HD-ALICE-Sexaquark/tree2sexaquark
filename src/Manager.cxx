@@ -1,6 +1,14 @@
+#include "Analysis/Manager.hxx"
+
 #include <unordered_set>
 
-#include "Analysis/Manager.hxx"
+// ROOT::Math libraries
+#include "Math/Point3D.h"
+#include "Math/Vector3D.h"
+#include "Math/Vector4D.h"
+#include "Math/VectorUtil.h"
+
+#include "Math/KalmanFilter.hxx"
 
 /*
  * Default constructor (with arguments)
@@ -29,6 +37,13 @@ AnalysisManager::AnalysisManager(Settings_tt Settings)  //
       getTrackEntry_fromEsdIdx(),
       getMcIdx_fromEsdIdx(),
       /*  */
+      esdIndicesOfAntiProtonTracks(),
+      esdIndicesOfProtonTracks(),
+      esdIndicesOfNegKaonTracks(),
+      esdIndicesOfPosKaonTracks(),
+      esdIndicesOfPiMinusTracks(),
+      esdIndicesOfPiPlusTracks(),
+      /*  */
       mcIndicesOfTrueV0s(),
       getNegDauEsdIdx_fromMcIdx(),
       getPosDauEsdIdx_fromMcIdx(),
@@ -42,7 +57,7 @@ void AnalysisManager::Print() {
     //
     InfoF("IsMC           = %i", (Int_t)Settings.IsMC);
     InfoF("IsSignalMC     = %i", (Int_t)Settings.IsSignalMC);
-    InfoF("InputFile_Path = %s", Settings.PathInputFile.c_str());
+    InfoF("InputFile     = %s", Settings.PathInputFile.c_str());
     InfoF("LimitToNEvents = %lld", Settings.LimitToNEvents);
 }
 
@@ -149,12 +164,21 @@ void AnalysisManager::ProcessTracks() {
         if (GetReactionID(Track.Idx_True, ReactionID)) {
             getEsdIndices_fromReactionID[ReactionID].push_back(Track.Idx);
         }
-        /*  */
+        /* PID */
         if (!GetPdgCode(Track.Idx_True, True_PdgCode)) continue;
-        if (True_PdgCode != 2212) continue;
+        if (True_PdgCode == -2212) esdIndicesOfAntiProtonTracks.push_back(Track.Idx);
+        if (True_PdgCode == 2212) esdIndicesOfProtonTracks.push_back(Track.Idx);
+        if (True_PdgCode == -321) esdIndicesOfNegKaonTracks.push_back(Track.Idx);
+        if (True_PdgCode == 321) esdIndicesOfPosKaonTracks.push_back(Track.Idx);
+        if (True_PdgCode == -211) esdIndicesOfPiMinusTracks.push_back(Track.Idx);
+        if (True_PdgCode == 211) esdIndicesOfPiPlusTracks.push_back(Track.Idx);
         // InfoF("%i, %i, %i, %f, %f, %f, %f", Track.Idx, Track.Idx_True, True_PdgCode, Track.Px, Track.Py, Track.Pz, Track.NSigmaProton);
     }
 }
+
+/*         */
+/**  V0s  **/
+/*** === ***/
 
 /*
  * Find all true (primary, secondary, signal) V0s for which both of their daughters were reconstructed and passed track selection
@@ -182,6 +206,171 @@ void AnalysisManager::ProcessFindableV0s() {
               Pos_McIdx, Pos_PdgCode, Pos_EsdIdx);
     }
 }
+
+/*
+ * Find all V0s via Kalman Filter.
+ * Note: if `pdgV0 == -1` (default value), it will store K0S candidates and secondary pion pairs.
+ */
+void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0) {
+
+    KFParticle::SetField(5.);
+
+    Track_tt TrackNeg, TrackPos;
+    Int_t mcIdxNeg, mcIdxPos;
+    Int_t mcIdxV0;
+
+    /* Declare KFParticle objects */
+
+    KFParticle kfDaughterNeg, kfDaughterPos;
+    KFParticle kfTransportedNeg, kfTransportedPos;
+
+    /* Declare 4-momentum vectors */
+
+    Math::PxPyPzEVector lvTrackNeg, lvTrackPos;
+    Math::PxPyPzEVector lvV0;
+
+    /* Information from MC */
+
+    Bool_t is_true;
+    Bool_t is_secondary;
+    Bool_t is_signal;
+    Int_t reaction_id;
+    Bool_t is_hybrid;
+
+    /* Choose tracks species to loop over */
+
+    std::vector<UInt_t> esdIndicesNegTracks;
+    std::vector<UInt_t> esdIndicesPosTracks;
+    if (pdgV0 == -3122) {
+        esdIndicesNegTracks = esdIndicesOfAntiProtonTracks;
+        esdIndicesPosTracks = esdIndicesOfPiPlusTracks;
+    } else if (pdgV0 == 3122) {
+        esdIndicesNegTracks = esdIndicesOfPiMinusTracks;
+        esdIndicesPosTracks = esdIndicesOfProtonTracks;
+    } else {
+        esdIndicesNegTracks = esdIndicesOfPiMinusTracks;
+        esdIndicesPosTracks = esdIndicesOfPiPlusTracks;
+    }
+
+    /* Loop over all possible pairs of tracks */
+
+    for (UInt_t esdIdxNeg : esdIndicesNegTracks) {
+        for (UInt_t esdIdxPos : esdIndicesPosTracks) {
+
+            /* Sanity check: prevent tracks from being repeated */
+
+            if (esdIdxNeg == esdIdxPos) continue;
+
+            /* Get tracks */
+
+            GetTrack(esdIdxNeg, TrackNeg);
+            GetTrack(esdIdxPos, TrackPos);
+
+            InfoF(
+                "neg(%u)=(%f, %f, %f) ; charge=%i, alpha=%f, snp=%f, tgl=%f, signed1pt=%f, cov[0]=%f, cov[1]=%f, cov[2]=%f, cov[3]=%f, cov[4]=%f, "
+                "cov[5]=%f, cov[6]=%f, cov[7]=%f, cov[8]=%f, cov[9]=%f, cov[10]=%f, cov[11]=%f, cov[12]=%f, cov[13]=%f, cov[14]=%f",  //
+                esdIdxNeg, TrackNeg.Px, TrackNeg.Py, TrackNeg.Pz,                                                                     //
+                TrackNeg.Charge, TrackNeg.Alpha, TrackNeg.Snp, TrackNeg.Tgl, TrackNeg.Signed1Pt,                                      //
+                TrackNeg.CovMatrix[0], TrackNeg.CovMatrix[1], TrackNeg.CovMatrix[2], TrackNeg.CovMatrix[3], TrackNeg.CovMatrix[4],
+                TrackNeg.CovMatrix[5], TrackNeg.CovMatrix[6], TrackNeg.CovMatrix[7], TrackNeg.CovMatrix[8], TrackNeg.CovMatrix[9],
+                TrackNeg.CovMatrix[10], TrackNeg.CovMatrix[11], TrackNeg.CovMatrix[12], TrackNeg.CovMatrix[13], TrackNeg.CovMatrix[14]);
+
+            continue;
+
+            /* Kalman Filter */
+
+            kfDaughterNeg = CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNegDaughter)->Mass());
+            kfDaughterPos = CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPosDaughter)->Mass());
+
+            InfoF("neg(kf)=(%f, %f, %f) ; pos(kf)=(%f, %f, %f)",               //
+                  kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
+                  kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz());
+
+            KFParticle kfV0;
+            kfV0.AddDaughter(kfDaughterNeg);
+            kfV0.AddDaughter(kfDaughterPos);
+
+            /* Transport V0 and daughters */
+
+            // kfV0.TransportToDecayVertex();
+            // kfTransportedNeg = TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
+            //    (Int_t)TrackNeg.Charge);
+            // kfTransportedPos = TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
+            //    (Int_t)TrackPos.Charge);
+
+            /* Reconstruct V0 */
+
+            lvTrackNeg = Math::PxPyPzMVector(kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
+                                             fPDG.GetParticle(pdgNegDaughter)->Mass());
+            lvTrackPos = Math::PxPyPzMVector(kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz(),  //
+                                             fPDG.GetParticle(pdgPosDaughter)->Mass());
+            lvV0 = lvTrackNeg + lvTrackPos;
+
+            /* Optimization: if `pdgV0 == -1`, use the same pi+pi- loop to process both K0S and pi+pi- coming from a signal reaction */
+
+            std::vector<Int_t> pdgV0s = {pdgV0};
+            if (pdgV0 == -1) pdgV0s = {422, 310};
+
+            for (Int_t& auxPdgV0 : pdgV0s) {
+
+                /* Collect true information */
+
+                UInt_t mc_neg, mc_pos;
+                UInt_t mc_neg_mc_mother, mc_pos_mc_mother;
+                Int_t mc_pdg_mother;
+                if (!GetMcIdx(esdIdxNeg, mc_neg) || !GetMcIdx(esdIdxPos, mc_pos)) continue;
+                if (!GetMotherMcIdx(mc_neg, mc_neg_mc_mother) || !GetMotherMcIdx(mc_pos, mc_pos_mc_mother)) continue;
+
+                /* DEBUG: select only true V0s */
+
+                if (mc_neg_mc_mother != mc_pos_mc_mother) continue;
+                if (!GetPdgCode(mc_neg_mc_mother, mc_pdg_mother)) continue;
+                if (mc_pdg_mother != pdgV0) continue;
+
+                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
+
+                /*
+                mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
+                mcIdxV0 = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
+                                    getMotherMcIdx_fromMcIdx[mcIdxNeg] == getMotherMcIdx_fromMcIdx[mcIdxPos]
+                                ? getMotherMcIdx_fromMcIdx[mcIdxNeg]
+                                : -1;
+                mc_pdg_code = mcIdxV0 >= 0 ? getPdgCode_fromMcIdx[mcIdxV0] : -1;
+                */
+                /** Note: different treatment for pion pairs, since they don't have a true MC V0 **/
+                /*
+                if (auxPdgV0 == 422) {
+                    is_true = !doesMcIdxHaveMother[mcIdxNeg] && !doesMcIdxHaveMother[mcIdxPos] &&  //
+                                getPdgCode_fromMcIdx[mcIdxNeg] == pdgNegDaughter && getPdgCode_fromMcIdx[mcIdxPos] == pdgPosDaughter;
+                    is_secondary = isMcIdxSecondary[mcIdxNeg] && isMcIdxSecondary[mcIdxPos] && is_true;
+                    is_signal = isMcIdxSignal[mcIdxNeg] && isMcIdxSignal[mcIdxPos] &&                      //
+                                getReactionID_fromMcIdx[mcIdxNeg] == getReactionID_fromMcIdx[mcIdxPos] &&  //
+                                is_secondary;
+                    reaction_id = is_signal ? getReactionID_fromMcIdx[mcIdxNeg] : -1;
+                } else {
+                    is_true = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
+                                getMotherMcIdx_fromMcIdx[mcIdxNeg] == getMotherMcIdx_fromMcIdx[mcIdxPos] && //
+                                getPdgCode_fromMcIdx[mcIdxNeg] == pdgNegDaughter && getPdgCode_fromMcIdx[mcIdxPos] == pdgPosDaughter &&
+                // mc_pdg_code == auxPdgV0; is_secondary = isMcIdxSecondary[mcIdxV0] && is_true; is_signal = isMcIdxSignal[mcIdxV0] &&
+                is_secondary; reaction_id = getReactionID_fromMcIdx[mcIdxV0];
+                            }
+                            is_hybrid = (isMcIdxSignal[mcIdxNeg] || isMcIdxSignal[mcIdxPos]) && !is_signal;
+                */
+                /* Apply cuts and store V0 */
+                /*
+                if (PassesV0CutsAs(auxPdgV0, kfV0, kfDaughterNeg, kfDaughterPos, lvV0, lvTrackNeg, lvTrackPos, is_true, is_secondary, is_signal)) {
+                    StoreV0As(auxPdgV0, kfV0, kfDaughterNeg, kfDaughterPos, lvV0, lvTrackNeg, lvTrackPos, esdIdxNeg, esdIdxPos, mcIdxV0, mc_pdg_code,
+                              is_true, is_secondary, is_signal, reaction_id, is_hybrid);
+                }
+                */
+            }
+        }  // end of loop over pos. tracks
+    }      // end of loop over neg. tracks
+}
+
+/*                */
+/**  Sexaquarks  **/
+/*** ========== ***/
 
 /*
  *
@@ -242,11 +431,18 @@ void AnalysisManager::CleanContainers() {
     getTrackEntry_fromEsdIdx.clear();
     getMcIdx_fromEsdIdx.clear();
     //
-    getEsdIndices_fromReactionID.clear();
+    esdIndicesOfAntiProtonTracks.clear();
+    esdIndicesOfProtonTracks.clear();
+    esdIndicesOfNegKaonTracks.clear();
+    esdIndicesOfPosKaonTracks.clear();
+    esdIndicesOfPiMinusTracks.clear();
+    esdIndicesOfPiPlusTracks.clear();
     //
     mcIndicesOfTrueV0s.clear();
     getNegDauEsdIdx_fromMcIdx.clear();
     getPosDauEsdIdx_fromMcIdx.clear();
+    //
+    getEsdIndices_fromReactionID.clear();
 }
 
 /*
