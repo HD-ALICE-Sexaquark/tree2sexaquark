@@ -57,7 +57,7 @@ void AnalysisManager::Print() {
     //
     InfoF("IsMC           = %i", (Int_t)Settings.IsMC);
     InfoF("IsSignalMC     = %i", (Int_t)Settings.IsSignalMC);
-    InfoF("InputFile     = %s", Settings.PathInputFile.c_str());
+    InfoF("InputFile      = %s", Settings.PathInputFile.c_str());
     InfoF("LimitToNEvents = %lld", Settings.LimitToNEvents);
 }
 
@@ -95,7 +95,7 @@ void AnalysisManager::ProcessInjected() {
 
     for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
         if (!ReadInjected(sexa_entry)) continue;
-        // InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
+        // DebugF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
     }
 }
 
@@ -172,7 +172,6 @@ void AnalysisManager::ProcessTracks() {
         if (True_PdgCode == 321) esdIndicesOfPosKaonTracks.push_back(Track.Idx);
         if (True_PdgCode == -211) esdIndicesOfPiMinusTracks.push_back(Track.Idx);
         if (True_PdgCode == 211) esdIndicesOfPiPlusTracks.push_back(Track.Idx);
-        // InfoF("%i, %i, %i, %f, %f, %f, %f", Track.Idx, Track.Idx_True, True_PdgCode, Track.Px, Track.Py, Track.Pz, Track.NSigmaProton);
     }
 }
 
@@ -266,25 +265,10 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
             GetTrack(esdIdxNeg, TrackNeg);
             GetTrack(esdIdxPos, TrackPos);
 
-            InfoF(
-                "neg(%u)=(%f, %f, %f) ; charge=%i, alpha=%f, snp=%f, tgl=%f, signed1pt=%f, cov[0]=%f, cov[1]=%f, cov[2]=%f, cov[3]=%f, cov[4]=%f, "
-                "cov[5]=%f, cov[6]=%f, cov[7]=%f, cov[8]=%f, cov[9]=%f, cov[10]=%f, cov[11]=%f, cov[12]=%f, cov[13]=%f, cov[14]=%f",  //
-                esdIdxNeg, TrackNeg.Px, TrackNeg.Py, TrackNeg.Pz,                                                                     //
-                TrackNeg.Charge, TrackNeg.Alpha, TrackNeg.Snp, TrackNeg.Tgl, TrackNeg.Signed1Pt,                                      //
-                TrackNeg.CovMatrix[0], TrackNeg.CovMatrix[1], TrackNeg.CovMatrix[2], TrackNeg.CovMatrix[3], TrackNeg.CovMatrix[4],
-                TrackNeg.CovMatrix[5], TrackNeg.CovMatrix[6], TrackNeg.CovMatrix[7], TrackNeg.CovMatrix[8], TrackNeg.CovMatrix[9],
-                TrackNeg.CovMatrix[10], TrackNeg.CovMatrix[11], TrackNeg.CovMatrix[12], TrackNeg.CovMatrix[13], TrackNeg.CovMatrix[14]);
-
-            continue;
-
             /* Kalman Filter */
 
             kfDaughterNeg = CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNegDaughter)->Mass());
             kfDaughterPos = CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPosDaughter)->Mass());
-
-            InfoF("neg(kf)=(%f, %f, %f) ; pos(kf)=(%f, %f, %f)",               //
-                  kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
-                  kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz());
 
             KFParticle kfV0;
             kfV0.AddDaughter(kfDaughterNeg);
@@ -292,11 +276,11 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
 
             /* Transport V0 and daughters */
 
-            // kfV0.TransportToDecayVertex();
-            // kfTransportedNeg = TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
-            //    (Int_t)TrackNeg.Charge);
-            // kfTransportedPos = TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
-            //    (Int_t)TrackPos.Charge);
+            kfV0.TransportToDecayVertex();
+            kfTransportedNeg = TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
+                                                   (Int_t)TrackNeg.Charge);
+            kfTransportedPos = TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
+                                                   (Int_t)TrackPos.Charge);
 
             /* Reconstruct V0 */
 
@@ -406,6 +390,43 @@ void AnalysisManager::ProcessFindableSexaquarks() {
             InfoF("%i, %u, %u, %i, %f, %f, %f", Injected.ReactionID, EsdIdx, Track.Idx_True, pdg_code, Track.Px, Track.Py, Track.Pz);
         }
     }
+}
+
+/*
+ *
+ */
+void AnalysisManager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts) {
+    //
+    if (pdgReactionProducts.size() > 2) {
+        KalmanSexaquarkFinder_TypeDE(pdgReactionProducts);
+    } else {
+        if (TMath::Abs(pdgStruckNucleon) == 2112) {
+            KalmanSexaquarkFinder_TypeA(pdgReactionProducts);
+        } else {
+            KalmanSexaquarkFinder_TypeH(pdgReactionProducts);
+        }
+    }
+}
+
+/*
+ *
+ */
+void AnalysisManager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts) {
+    //
+}
+
+/*
+ *
+ */
+void AnalysisManager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts) {
+    //
+}
+
+/*
+ *
+ */
+void AnalysisManager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts) {
+    //
 }
 
 /*               */

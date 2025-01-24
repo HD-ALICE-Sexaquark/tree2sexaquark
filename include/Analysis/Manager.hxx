@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "RtypesCore.h"
 #include "TDatabasePDG.h"
 #include "TDirectoryFile.h"
 #include "TFile.h"
@@ -47,7 +48,7 @@ class AnalysisManager : public Reader {
             DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
             return kFALSE;
         }
-        Event_UID = TString::Format("A18_%i_%04u_%03u", Event.RunNumber, Event.EventNumber, Event.DirNumber);
+        Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
         InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
 
         Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
@@ -94,6 +95,10 @@ class AnalysisManager : public Reader {
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
+    void KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts);
+    void KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts);
+    void KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts);
+    void KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts);
 
     /* Related to Containers */
     /* -- filled at `ProcessMCParticles()` */

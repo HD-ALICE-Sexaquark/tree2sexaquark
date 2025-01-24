@@ -81,30 +81,30 @@ struct MC_tt {
  * Simple Tree name: "Tracks"
  */
 struct Track_tt {
-    UInt_t Idx;             //
-    Float_t Px;             // inner parametrization
-    Float_t Py;             // inner parametrization
-    Float_t Pz;             // inner parametrization
-    Float_t X;              //
-    Float_t Y;              //
-    Float_t Z;              //
-    Int_t Charge;           //
-    Float_t Alpha;          //
-    Float_t Snp;            // local sine of the track momentum azimuthal angle
-    Float_t Tgl;            // tangent of the track momentum dip angle
-    Float_t Signed1Pt;      // 1/pt
-    Float_t CovMatrix[15];  // covariance matrix
-    // Float_t NSigmaPion;     //
-    // Float_t NSigmaKaon;     //
-    // Float_t NSigmaProton;   //
-    // Float_t DCAxy;          // pre-calculated DCA wrt PV
-    // Float_t DCAz;           // pre-calculated DCA wrt PV
-    // UShort_t NTPCClusters;       //
-    // Float_t NCrossedRows;        //
-    // UShort_t NFindableClusters;  //
-    // UShort_t NSharedClusters;    //
-    // Float_t Chi2overNcls;   //
-    // Bool_t IsKinkDaughter;  //
+    UInt_t Idx;                  //
+    Float_t Px;                  // inner parametrization
+    Float_t Py;                  // inner parametrization
+    Float_t Pz;                  // inner parametrization
+    Float_t X;                   //
+    Float_t Y;                   //
+    Float_t Z;                   //
+    Short_t Charge;              //
+    Float_t Alpha;               //
+    Float_t Snp;                 // local sine of the track momentum azimuthal angle
+    Float_t Tgl;                 // tangent of the track momentum dip angle
+    Float_t Signed1Pt;           // 1/pt
+    Float_t CovMatrix[15];       // covariance matrix
+    Float_t NSigmaPion;          //
+    Float_t NSigmaKaon;          //
+    Float_t NSigmaProton;        //
+    Float_t DCAxy;               // pre-calculated DCA wrt PV
+    Float_t DCAz;                // pre-calculated DCA wrt PV
+    UShort_t NTPCClusters;       //
+    Float_t NCrossedRows;        //
+    UShort_t NFindableClusters;  //
+    UShort_t NSharedClusters;    //
+    Float_t Chi2overNcls;        //
+    Bool_t IsKinkDaughter;       //
     // TBits TPCFitMap;             //
     // TBits TPCClusterMap;         //
     // TBits TPCSharedMap;          //
