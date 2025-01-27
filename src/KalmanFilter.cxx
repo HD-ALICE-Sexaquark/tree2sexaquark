@@ -71,12 +71,11 @@ KFParticle CreateKFParticle(Track_tt track, Double_t mass) {
  * - Arguments: XYZ[3], CovarianceMatrix[6]
  * (Copied from (https://github.com/alisw/AliPhysics)/PWGLF/.../AliAnalysisTaskDoubleHypNucTree.cxx`)
  */
-// KFVertex CreateKFVertex(Float_t* XYZ, Float_t* CovarianceMatrix) {
-KFVertex CreateKFVertex(Float_t* XYZ) {
+KFVertex CreateKFVertex(Float_t* XYZ, Float_t* CovarianceMatrix) {
 
     KFPVertex kfpVtx;
     kfpVtx.SetXYZ(XYZ);
-    // kfpVtx.SetCovarianceMatrix(CovarianceMatrix);
+    kfpVtx.SetCovarianceMatrix(CovarianceMatrix);
 
     KFVertex KFVtx(kfpVtx);
 

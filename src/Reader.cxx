@@ -9,20 +9,22 @@ void Reader::ConnectEventBranches(Bool_t IsMC) {
     if (!IsMC) fTree_Events->SetBranchAddress("DirNumberB", &Event.DirNumberB);
     fTree_Events->SetBranchAddress("EventNumber", &Event.EventNumber);
     fTree_Events->SetBranchAddress("Centrality", &Event.Centrality);
-    fTree_Events->SetBranchAddress("PV_TrueXv", &Event.PV_TrueXv);
-    fTree_Events->SetBranchAddress("PV_TrueYv", &Event.PV_TrueYv);
-    fTree_Events->SetBranchAddress("PV_TrueZv", &Event.PV_TrueZv);
-    fTree_Events->SetBranchAddress("IsGenPileup", &Event.IsGenPileup);
-    fTree_Events->SetBranchAddress("IsSBCPileup", &Event.IsSBCPileup);
-    fTree_Events->SetBranchAddress("PV_RecXv", &Event.PV_RecXv);
-    fTree_Events->SetBranchAddress("PV_RecYv", &Event.PV_RecYv);
-    fTree_Events->SetBranchAddress("PV_RecZv", &Event.PV_RecZv);
+    fTree_Events->SetBranchAddress("MagneticField", &Event.MagneticField);
+    if (IsMC) {
+        fTree_Events->SetBranchAddress("PV_TrueXv", &Event.PV_TrueXv);
+        fTree_Events->SetBranchAddress("PV_TrueYv", &Event.PV_TrueYv);
+        fTree_Events->SetBranchAddress("PV_TrueZv", &Event.PV_TrueZv);
+        fTree_Events->SetBranchAddress("IsGenPileup", &Event.IsGenPileup);
+        fTree_Events->SetBranchAddress("IsSBCPileup", &Event.IsSBCPileup);
+    }
     fTree_Events->SetBranchAddress("PV_NContributors", &Event.PV_NContributors);
-    fTree_Events->SetBranchAddress("PV_ZvErr_FromSPD", &Event.PV_ZvErr_FromSPD);
-    fTree_Events->SetBranchAddress("PV_ZvErr_FromTracks", &Event.PV_ZvErr_FromTracks);
-    fTree_Events->SetBranchAddress("PV_Zv_FromSPD", &Event.PV_Zv_FromSPD);
-    fTree_Events->SetBranchAddress("PV_Zv_FromTracks", &Event.PV_Zv_FromTracks);
     fTree_Events->SetBranchAddress("PV_Dispersion", &Event.PV_Dispersion);
+    fTree_Events->SetBranchAddress("PV_Xv", &Event.PV_Xv);
+    fTree_Events->SetBranchAddress("PV_Yv", &Event.PV_Yv);
+    fTree_Events->SetBranchAddress("PV_Zv", &Event.PV_Zv);
+    fTree_Events->SetBranchAddress("PV_CovMatrix", Event.PV_CovMatrix);
+    fTree_Events->SetBranchAddress("SPD_PV_Zv", &Event.SPD_PV_Zv);
+    fTree_Events->SetBranchAddress("SPD_PV_ZvErr", &Event.SPD_PV_ZvErr);
     fTree_Events->SetBranchAddress("NTracks", &Event.NTracks);
     fTree_Events->SetBranchAddress("NTPCClusters", &Event.NTPCClusters);
     fTree_Events->SetBranchAddress("IsMB", &Event.IsMB);

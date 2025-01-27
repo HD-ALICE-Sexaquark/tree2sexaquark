@@ -48,8 +48,16 @@ class AnalysisManager : public Reader {
             DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
             return kFALSE;
         }
-        Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+        if (Settings.IsMC) {
+            if (Settings.IsSignalMC)
+                Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+            else
+                Event_UID = TString::Format("BKG_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+        } else {
+            Event_UID = TString::Format("DATA_%6u_%03u_%u_%03u", Event.RunNumber, Event.DirNumber, Event.DirNumberB, Event.EventNumber);
+        }
         InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
+        InfoF(">> Centrality = %f, PV = (%f, %f, %f), B = %f", Event.Centrality, Event.PV_Xv, Event.PV_Yv, Event.PV_Zv, Event.MagneticField);
 
         Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
         if (!Event_Dir) {

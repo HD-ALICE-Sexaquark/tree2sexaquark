@@ -212,7 +212,7 @@ void AnalysisManager::ProcessFindableV0s() {
  */
 void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0) {
 
-    KFParticle::SetField(5.);
+    KFParticle::SetField(Event.MagneticField);
 
     Track_tt TrackNeg, TrackPos;
     Int_t mcIdxNeg, mcIdxPos;
@@ -253,8 +253,8 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
 
     /* Loop over all possible pairs of tracks */
 
-    for (UInt_t esdIdxNeg : esdIndicesNegTracks) {
-        for (UInt_t esdIdxPos : esdIndicesPosTracks) {
+    for (UInt_t& esdIdxNeg : esdIndicesNegTracks) {
+        for (UInt_t& esdIdxPos : esdIndicesPosTracks) {
 
             /* Sanity check: prevent tracks from being repeated */
 

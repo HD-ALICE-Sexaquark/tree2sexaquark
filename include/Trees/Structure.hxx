@@ -13,32 +13,32 @@
  * Simple Tree name: "Events"
  */
 struct Event_tt {
-    UInt_t RunNumber;             //
-    UInt_t DirNumber;             //
-    UInt_t DirNumberB;            //
-    UInt_t EventNumber;           //
-    Float_t Centrality;           //
-    Float_t PV_TrueXv;            //
-    Float_t PV_TrueYv;            //
-    Float_t PV_TrueZv;            //
-    Bool_t IsGenPileup;           //
-    Bool_t IsSBCPileup;           //
-    Float_t PV_RecXv;             //
-    Float_t PV_RecYv;             //
-    Float_t PV_RecZv;             //
-    Int_t PV_NContributors;       //
-    Float_t PV_ZvErr_FromSPD;     //
-    Float_t PV_ZvErr_FromTracks;  //
-    Float_t PV_Zv_FromSPD;        //
-    Float_t PV_Zv_FromTracks;     //
-    Float_t PV_Dispersion;        //
-    UInt_t NTracks;               //
-    Int_t NTPCClusters;           //
-    Bool_t IsMB;                  //
-    Bool_t IsHighMultV0;          //
-    Bool_t IsHighMultSPD;         //
-    Bool_t IsCentral;             //
-    Bool_t IsSemiCentral;         //
+    UInt_t RunNumber;         //
+    UInt_t DirNumber;         //
+    UInt_t DirNumberB;        //
+    UInt_t EventNumber;       //
+    Float_t Centrality;       //
+    Float_t MagneticField;    //
+    Float_t PV_TrueXv;        //
+    Float_t PV_TrueYv;        //
+    Float_t PV_TrueZv;        //
+    Bool_t IsGenPileup;       //
+    Bool_t IsSBCPileup;       //
+    Int_t PV_NContributors;   //
+    Float_t PV_Dispersion;    //
+    Float_t PV_Xv;            //
+    Float_t PV_Yv;            //
+    Float_t PV_Zv;            //
+    Float_t PV_CovMatrix[6];  //
+    Float_t SPD_PV_Zv;        //
+    Float_t SPD_PV_ZvErr;     //
+    UInt_t NTracks;           //
+    Int_t NTPCClusters;       //
+    Bool_t IsMB;              //
+    Bool_t IsHighMultV0;      //
+    Bool_t IsHighMultSPD;     //
+    Bool_t IsCentral;         //
+    Bool_t IsSemiCentral;     //
 };
 
 /*
