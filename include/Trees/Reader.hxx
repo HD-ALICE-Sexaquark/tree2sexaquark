@@ -3,7 +3,7 @@
 
 #include "TTree.h"
 
-#include "Trees/Structure.hxx"
+#include "Trees/Input.hxx"
 
 class Reader {
    public:

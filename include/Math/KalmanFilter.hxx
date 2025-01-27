@@ -7,13 +7,12 @@
 #include "KFParticle.h"
 #include "KFVertex.h"
 
-#include "Trees/Structure.hxx"
+#include "Trees/Input.hxx"
 
 // namespace Tree2Sexaquark::Math {
 
 KFParticle CreateKFParticle(Track_tt track, Double_t mass);
-// KFVertex CreateKFVertex(Double_t* XYZ, Double_t* CovarianceMatrix);
-KFVertex CreateKFVertex(Double_t* XYZ);
+KFVertex CreateKFVertex(Double_t* XYZ, Double_t* CovarianceMatrix);
 KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t massThis, Int_t chargeThis);
 
 // }  // namespace Tree2Sexaquark::Math

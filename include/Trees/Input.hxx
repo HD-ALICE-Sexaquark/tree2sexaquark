@@ -4,8 +4,8 @@
 /* !!                                                                                                   !! */
 /***********************************************************************************************************/
 
-#ifndef T2S_TREES_STRUCTURE_HXX
-#define T2S_TREES_STRUCTURE_HXX
+#ifndef T2S_INPUT_TREES_STRUCTURE_HXX
+#define T2S_INPUT_TREES_STRUCTURE_HXX
 
 #include "Rtypes.h"
 
@@ -111,4 +111,4 @@ struct Track_tt {
     Int_t Idx_True;  //
 };
 
-#endif  // T2S_TREES_STRUCTURE_HXX
+#endif  // T2S_INPUT_TREES_STRUCTURE_HXX

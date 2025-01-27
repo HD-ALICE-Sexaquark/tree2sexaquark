@@ -18,13 +18,21 @@ target_include_directories(Reader
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
 
+add_library(Writer STATIC Writer.cxx)
+target_include_directories(Writer
+  PUBLIC
+    ${ROOT_INCLUDE_DIRS}
+    ${KFParticle_INCLUDE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+)
+
 add_library(KalmanFilter STATIC KalmanFilter.cxx)
 target_include_directories(KalmanFilter
   PUBLIC
     ${ROOT_INCLUDE_DIRS}
     ${KFParticle_INCLUDE_DIR}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-    )
+)
 
 add_library(Manager STATIC Manager.cxx)
 target_include_directories(Manager
@@ -38,8 +46,10 @@ source_group(
   TREE ${PROJECT_SOURCE_DIR}/include
   FILES
     ${PROJECT_SOURCE_DIR}/include/Utilities/Logger.hxx
-    ${PROJECT_SOURCE_DIR}/include/Trees/Structure.hxx
+    ${PROJECT_SOURCE_DIR}/include/Trees/Input.hxx
+    ${PROJECT_SOURCE_DIR}/include/Trees/Output.hxx
     ${PROJECT_SOURCE_DIR}/include/Trees/Reader.hxx
+    ${PROJECT_SOURCE_DIR}/include/Trees/Writer.hxx
     ${PROJECT_SOURCE_DIR}/include/Analysis/Settings.hxx
     ${PROJECT_SOURCE_DIR}/include/Utilities/CL1.hpp
     ${PROJECT_SOURCE_DIR}/include/Utilities/Parser.hxx

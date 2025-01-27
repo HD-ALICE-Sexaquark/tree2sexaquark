@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<AnalysisManager> ThisAnalysis = std::make_unique<AnalysisManager>(ParserInstance->GetSettings());
     ThisAnalysis->Print();
     if (!ThisAnalysis->OpenInputFile()) return 1;
+    if (!ThisAnalysis->PrepareOutputFile()) return 1;
 
     for (Long64_t evt_entry = 0; evt_entry < ThisAnalysis->GetN_Events(); evt_entry++) {
         if (!ThisAnalysis->GetEvent(evt_entry)) continue;

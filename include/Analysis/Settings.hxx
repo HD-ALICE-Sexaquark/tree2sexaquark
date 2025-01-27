@@ -5,6 +5,7 @@
 
 struct Settings_tt {
     std::string PathInputFile;
+    std::string PathOutputFile;
     bool IsMC;
     bool IsSignalMC;
     long long LimitToNEvents;

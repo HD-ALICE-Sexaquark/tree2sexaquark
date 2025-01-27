@@ -11,30 +11,19 @@
 #include "TFile.h"
 #include "TString.h"
 
-#ifndef HomogeneousField
-#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
-#endif
-#include "KFParticle.h"
-#include "KFVertex.h"
-
 #include "Utilities/Logger.hxx"
 
 #include "Analysis/Settings.hxx"
 #include "Trees/Reader.hxx"
+#include "Trees/Writer.hxx"
 
-using namespace ROOT;
-
-KFParticle CreateKFParticle(Track_tt track, Double_t mass);
-// KFVertex CreateKFVertex(Double_t* XYZ, Double_t* CovarianceMatrix);
-KFVertex CreateKFVertex(Double_t* XYZ);
-KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t massThis, Int_t chargeThis);
-
-class AnalysisManager : public Reader {
+class AnalysisManager : public Reader, public Writer {
    public:
     AnalysisManager(Settings_tt Settings);
 
     void Print();
     Bool_t OpenInputFile();
+    Bool_t PrepareOutputFile();
     Bool_t IsMC() { return Settings.IsMC; }
     Bool_t IsSignalMC() { return Settings.IsSignalMC; }
 
@@ -200,13 +189,15 @@ class AnalysisManager : public Reader {
     /* Analysis Properties */
     Settings_tt Settings;
 
-    /* ROOT Objects */
-    TDatabasePDG fPDG;
-    /* -- File */
+    /* -- Files */
     std::unique_ptr<TFile> InputFile;
+    std::unique_ptr<TFile> OutputFile;
     /* -- Event */
     TString Event_UID;
     std::unique_ptr<TDirectoryFile> Event_Dir;
+
+    /* ROOT Objects */
+    TDatabasePDG fPDG;
 
     /* Containers */
     /* -- filled at `ProcessMCParticles()` */

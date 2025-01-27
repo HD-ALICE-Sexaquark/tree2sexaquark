@@ -8,7 +8,15 @@
 #include "Math/Vector4D.h"
 #include "Math/VectorUtil.h"
 
+#ifndef HomogeneousField
+#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
+#endif
+#include "KFParticle.h"
+#include "KFVertex.h"
+
 #include "Math/KalmanFilter.hxx"
+
+using namespace ROOT;
 
 /*
  * Default constructor (with arguments)
@@ -58,6 +66,7 @@ void AnalysisManager::Print() {
     InfoF("IsMC           = %i", (Int_t)Settings.IsMC);
     InfoF("IsSignalMC     = %i", (Int_t)Settings.IsSignalMC);
     InfoF("InputFile      = %s", Settings.PathInputFile.c_str());
+    InfoF("OutputFile     = %s", Settings.PathOutputFile.c_str());
     InfoF("LimitToNEvents = %lld", Settings.LimitToNEvents);
 }
 
@@ -78,6 +87,24 @@ Bool_t AnalysisManager::OpenInputFile() {
 
     SetEventsTree(EventsTree);
     ConnectEventBranches(Settings.IsMC);
+
+    return kTRUE;
+}
+
+/*
+ *
+ */
+Bool_t AnalysisManager::PrepareOutputFile() {
+    //
+    OutputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings.PathOutputFile, "RECREATE"));
+    if (!OutputFile) {
+        ErrorF("TFile %s couldn't be created", Settings.PathOutputFile.c_str());
+        return kFALSE;
+    }
+    DebugF("TFile %s (re)created successfully", Settings.PathOutputFile.c_str());
+
+    InitV0sTree();
+    InitV0sBranches(Settings.IsMC);
 
     return kTRUE;
 }
@@ -312,7 +339,7 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
                 if (mc_pdg_mother != pdgV0) continue;
 
                 InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
-
+                FillV0(1, esdIdxNeg, esdIdxPos, auxPdgV0, lvV0, kfV0, lvTrackNeg, lvTrackPos, Settings.IsMC);
                 /*
                 mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
                 mcIdxV0 = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
@@ -483,4 +510,10 @@ void AnalysisManager::EndOfEvent() {
 void AnalysisManager::EndOfAnalysis() {
     //
     DisconnectEventBranches();
+    //
+    if (OutputFile) {
+        OutputFile->cd();
+        WriteV0sTree();
+        OutputFile->Write();
+    }
 }

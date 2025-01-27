@@ -24,9 +24,11 @@ Parser::Parser(std::string app_description)  //
 void Parser::AddOptions() {
     //
     CLI_APP
-        .add_option("-f,--file", Settings.PathInputFile, "Path of input file")  //
+        .add_option("-i,--input", Settings.PathInputFile, "Path of input file")  //
         ->required()
         ->check(CLI::ExistingPath);
+    Settings.PathOutputFile = "./SexaquarkResults.root";  // default
+    CLI_APP.add_option("-o,--output", Settings.PathOutputFile, "Path of output file");
     CLI_APP.add_flag("-m,--mc", Settings.IsMC, "Flag to process MC");
     CLI_APP.add_flag("-s,--signal", Settings.IsSignalMC, "Flag to process Signal MC");
     CLI_APP
