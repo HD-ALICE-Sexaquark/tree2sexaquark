@@ -17,19 +17,20 @@
 #include "Trees/Reader.hxx"
 #include "Trees/Writer.hxx"
 
-class AnalysisManager : public Reader, public Writer {
-   public:
-    AnalysisManager(Settings_tt Settings);
+namespace Tree2Sexaquark {
+namespace Analysis {
 
-    void Print();
+class Manager : public Reader, public Writer {
+   public:
+    Manager() = default;
+    ~Manager() = default;
+
     Bool_t OpenInputFile();
     Bool_t PrepareOutputFile();
-    Bool_t IsMC() { return Settings.IsMC; }
-    Bool_t IsSignalMC() { return Settings.IsSignalMC; }
 
     inline Long64_t GetN_Events() {
-        if (!Settings.LimitToNEvents) return GetEventsTree()->GetEntries();
-        return Settings.LimitToNEvents;
+        if (!Settings::LimitToNEvents) return GetEventsTree()->GetEntries();
+        return Settings::LimitToNEvents;
     }
 
     inline Bool_t GetEvent(Long64_t evt_idx) {
@@ -37,8 +38,8 @@ class AnalysisManager : public Reader, public Writer {
             DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
             return kFALSE;
         }
-        if (Settings.IsMC) {
-            if (Settings.IsSignalMC)
+        if (Settings::IsMC) {
+            if (Settings::IsSignalMC)
                 Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
             else
                 Event_UID = TString::Format("BKG_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
@@ -186,9 +187,6 @@ class AnalysisManager : public Reader, public Writer {
     void EndOfAnalysis();
 
    private:
-    /* Analysis Properties */
-    Settings_tt Settings;
-
     /* -- Files */
     std::unique_ptr<TFile> InputFile;
     std::unique_ptr<TFile> OutputFile;
@@ -228,5 +226,8 @@ class AnalysisManager : public Reader, public Writer {
     /* -- used in `ProcessFindableSexaquarks()` */
     std::unordered_map<UInt_t, std::vector<UInt_t>> getEsdIndices_fromReactionID;  // key: `ReactionID`
 };
+
+}  // namespace Analysis
+}  // namespace Tree2Sexaquark
 
 #endif  // T2S_ANALYSIS_MANAGER_HXX

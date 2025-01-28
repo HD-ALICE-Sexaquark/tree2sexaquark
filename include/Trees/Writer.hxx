@@ -3,23 +3,12 @@
 
 #include "TTree.h"
 
-// ROOT::Math libraries
-#include "Math/Point3D.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "Math/VectorUtil.h"
-
-#ifndef HomogeneousField
-#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
-#endif
-#include "KFParticle.h"
-#include "KFVertex.h"
-
 #include "Utilities/Logger.hxx"
 
+#include "Particles/V0.hxx"
 #include "Trees/Output.hxx"
 
-using namespace ROOT;
+namespace Tree2Sexaquark {
 
 class Writer {
    public:
@@ -31,11 +20,8 @@ class Writer {
     V0_tt V0;
 
     void InitV0sTree() { fTree_V0s = new TTree("V0s", "V0s"); }
-    void InitV0sBranches(Bool_t IsMC);
-    void FillV0(UInt_t idxV0, UInt_t esdIdxNegDau, UInt_t esdIdxPosDau, Int_t pdgV0, Math::PxPyPzEVector lvV0, KFParticle kfV0,
-                Math::PxPyPzEVector lvNegDaughter, Math::PxPyPzEVector lvPosDaughter,  //
-                Bool_t AnalysisMC = kFALSE, Bool_t isTrue = kFALSE, Int_t mcIdxV0 = -1, Int_t mcPdgCode = -1, Bool_t isSecondary = kFALSE,
-                Bool_t isSignal = kFALSE, Int_t ReactionID = -1, Bool_t isHybrid = kFALSE);
+    void InitV0sBranches();
+    void FillV0(UInt_t idxV0, Particle::V0 thisV0);
     void WriteV0sTree() {
         if (!fTree_V0s->GetDirectory()) {
             ErrorF("TTree %s has no directory", fTree_V0s->GetName());
@@ -69,10 +55,10 @@ class Writer {
         fTree_Sexaquarks_LNKPP = new TTree("Sexaquarks_LNKPP", "Sexaquarks_LNKPP");
         fTree_Sexaquarks_NKNKX = new TTree("Sexaquarks_NKNKX", "Sexaquarks_NKNKX");
     }
-    void InitSexaquarkBranches_TypeA(Bool_t IsMC);
-    void InitSexaquarkBranches_TypeD(Bool_t IsMC);
-    void InitSexaquarkBranches_TypeE(Bool_t IsMC);
-    void InitKaonPairBranches(Bool_t IsMC);
+    void InitSexaquarkBranches_TypeA();
+    void InitSexaquarkBranches_TypeD();
+    void InitSexaquarkBranches_TypeE();
+    void InitKaonPairBranches();
 
    private:
     /* -- V0s */
@@ -88,5 +74,7 @@ class Writer {
     TTree* fTree_Sexaquarks_LNKPP;
     TTree* fTree_Sexaquarks_NKNKX;
 };
+
+}  // namespace Tree2Sexaquark
 
 #endif  // T2S_TREES_READER_HXX

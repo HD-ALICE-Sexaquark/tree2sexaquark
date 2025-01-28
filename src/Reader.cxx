@@ -1,16 +1,20 @@
 #include "Trees/Reader.hxx"
 
+#include "Analysis/Settings.hxx"
+
+namespace Tree2Sexaquark {
+
 /*
  *
  */
-void Reader::ConnectEventBranches(Bool_t IsMC) {
+void Reader::ConnectEventBranches() {
     fTree_Events->SetBranchAddress("RunNumber", &Event.RunNumber);
     fTree_Events->SetBranchAddress("DirNumber", &Event.DirNumber);
-    if (!IsMC) fTree_Events->SetBranchAddress("DirNumberB", &Event.DirNumberB);
+    if (!Analysis::Settings::IsMC) fTree_Events->SetBranchAddress("DirNumberB", &Event.DirNumberB);
     fTree_Events->SetBranchAddress("EventNumber", &Event.EventNumber);
     fTree_Events->SetBranchAddress("Centrality", &Event.Centrality);
     fTree_Events->SetBranchAddress("MagneticField", &Event.MagneticField);
-    if (IsMC) {
+    if (Analysis::Settings::IsMC) {
         fTree_Events->SetBranchAddress("PV_TrueXv", &Event.PV_TrueXv);
         fTree_Events->SetBranchAddress("PV_TrueYv", &Event.PV_TrueYv);
         fTree_Events->SetBranchAddress("PV_TrueZv", &Event.PV_TrueZv);
@@ -100,3 +104,5 @@ void Reader::ConnectTracksBranches() {
     fTree_Tracks->SetBranchAddress("IsKinkDaughter", &Track.IsKinkDaughter);
     fTree_Tracks->SetBranchAddress("Idx_True", &Track.Idx_True);
 }
+
+}  // namespace Tree2Sexaquark

@@ -15,78 +15,28 @@
 #include "KFVertex.h"
 
 #include "Math/KalmanFilter.hxx"
+#include "Particles/V0.hxx"
 
-using namespace ROOT;
-
-/*
- * Default constructor (with arguments)
- */
-AnalysisManager::AnalysisManager(Settings_tt Settings)  //
-    : Reader(),                                         //
-      /*  */
-      Settings(Settings),
-      /*  */
-      fPDG(),
-      InputFile(nullptr),
-      Event_UID(""),
-      Event_Dir(nullptr),
-      /*  */
-      getMcEntry_fromMcIdx(),
-      getPdgCode_fromMcIdx(),
-      isMcIdxSignal(),
-      isMcIdxSecondary(),
-      getReactionID_fromMcIdx(),
-      getMcIndices_fromReactionID(),
-      getMotherMcIdx_fromMcIdx(),
-      getAncestorMcIdx_fromMcIdx(),
-      getNegDauMcIdx_fromMcIdx(),
-      getPosDauMcIdx_fromMcIdx(),
-      /*  */
-      getTrackEntry_fromEsdIdx(),
-      getMcIdx_fromEsdIdx(),
-      /*  */
-      esdIndicesOfAntiProtonTracks(),
-      esdIndicesOfProtonTracks(),
-      esdIndicesOfNegKaonTracks(),
-      esdIndicesOfPosKaonTracks(),
-      esdIndicesOfPiMinusTracks(),
-      esdIndicesOfPiPlusTracks(),
-      /*  */
-      mcIndicesOfTrueV0s(),
-      getNegDauEsdIdx_fromMcIdx(),
-      getPosDauEsdIdx_fromMcIdx(),
-      /*  */
-      getEsdIndices_fromReactionID() {}
+namespace Tree2Sexaquark {
+namespace Analysis {
 
 /*
  *
  */
-void AnalysisManager::Print() {
+Bool_t Manager::OpenInputFile() {
     //
-    InfoF("IsMC           = %i", (Int_t)Settings.IsMC);
-    InfoF("IsSignalMC     = %i", (Int_t)Settings.IsSignalMC);
-    InfoF("InputFile      = %s", Settings.PathInputFile.c_str());
-    InfoF("OutputFile     = %s", Settings.PathOutputFile.c_str());
-    InfoF("LimitToNEvents = %lld", Settings.LimitToNEvents);
-}
-
-/*
- *
- */
-Bool_t AnalysisManager::OpenInputFile() {
-    //
-    InputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings.PathInputFile, "READ"));
+    InputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings::PathInputFile, "READ"));
     if (!InputFile || InputFile->IsZombie()) {
-        ErrorF("TFile %s couldn't be opened", Settings.PathInputFile.c_str());
+        ErrorF("TFile %s couldn't be opened", Settings::PathInputFile.c_str());
         return kFALSE;
     }
-    DebugF("TFile %s opened successfully", Settings.PathInputFile.c_str());
+    DebugF("TFile %s opened successfully", Settings::PathInputFile.c_str());
 
     TTree* EventsTree = FindTreeInFile("Events");
     if (!EventsTree) return kFALSE;
 
     SetEventsTree(EventsTree);
-    ConnectEventBranches(Settings.IsMC);
+    ConnectEventBranches();
 
     return kTRUE;
 }
@@ -94,17 +44,17 @@ Bool_t AnalysisManager::OpenInputFile() {
 /*
  *
  */
-Bool_t AnalysisManager::PrepareOutputFile() {
+Bool_t Manager::PrepareOutputFile() {
     //
-    OutputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings.PathOutputFile, "RECREATE"));
+    OutputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings::PathOutputFile, "RECREATE"));
     if (!OutputFile) {
-        ErrorF("TFile %s couldn't be created", Settings.PathOutputFile.c_str());
+        ErrorF("TFile %s couldn't be created", Settings::PathOutputFile.c_str());
         return kFALSE;
     }
-    DebugF("TFile %s (re)created successfully", Settings.PathOutputFile.c_str());
+    DebugF("TFile %s (re)created successfully", Settings::PathOutputFile.c_str());
 
     InitV0sTree();
-    InitV0sBranches(Settings.IsMC);
+    InitV0sBranches();
 
     return kTRUE;
 }
@@ -112,7 +62,7 @@ Bool_t AnalysisManager::PrepareOutputFile() {
 /*
  *
  */
-void AnalysisManager::ProcessInjected() {
+void Manager::ProcessInjected() {
     //
     TTree* InjectedTree = FindTreeInEventDir("Injected");
     if (!InjectedTree) return;
@@ -129,7 +79,7 @@ void AnalysisManager::ProcessInjected() {
 /*
  *
  */
-void AnalysisManager::ProcessMCParticles() {
+void Manager::ProcessMCParticles() {
     //
     TTree* MCTree = FindTreeInEventDir("MC");
     if (!MCTree) return;
@@ -162,7 +112,7 @@ void AnalysisManager::ProcessMCParticles() {
 /*
  *
  */
-void AnalysisManager::ProcessTracks() {
+void Manager::ProcessTracks() {
     //
     TTree* TracksTree = FindTreeInEventDir("Tracks");
     if (!TracksTree) return;
@@ -209,7 +159,7 @@ void AnalysisManager::ProcessTracks() {
 /*
  * Find all true (primary, secondary, signal) V0s for which both of their daughters were reconstructed and passed track selection
  */
-void AnalysisManager::ProcessFindableV0s() {
+void Manager::ProcessFindableV0s() {
     //
     Int_t V0_PdgCode;
     UInt_t Neg_McIdx, Pos_McIdx;
@@ -237,7 +187,7 @@ void AnalysisManager::ProcessFindableV0s() {
  * Find all V0s via Kalman Filter.
  * Note: if `pdgV0 == -1` (default value), it will store K0S candidates and secondary pion pairs.
  */
-void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0) {
+void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0) {
 
     KFParticle::SetField(Event.MagneticField);
 
@@ -252,8 +202,8 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
 
     /* Declare 4-momentum vectors */
 
-    Math::PxPyPzEVector lvTrackNeg, lvTrackPos;
-    Math::PxPyPzEVector lvV0;
+    ROOT::Math::PxPyPzEVector lvTrackNeg, lvTrackPos;
+    ROOT::Math::PxPyPzEVector lvV0;
 
     /* Information from MC */
 
@@ -294,8 +244,8 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
 
             /* Kalman Filter */
 
-            kfDaughterNeg = CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNegDaughter)->Mass());
-            kfDaughterPos = CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPosDaughter)->Mass());
+            kfDaughterNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNegDaughter)->Mass());
+            kfDaughterPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPosDaughter)->Mass());
 
             KFParticle kfV0;
             kfV0.AddDaughter(kfDaughterNeg);
@@ -304,17 +254,17 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
             /* Transport V0 and daughters */
 
             kfV0.TransportToDecayVertex();
-            kfTransportedNeg = TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
-                                                   (Int_t)TrackNeg.Charge);
-            kfTransportedPos = TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
-                                                   (Int_t)TrackPos.Charge);
+            kfTransportedNeg = Math::TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
+                                                         (Int_t)TrackNeg.Charge);
+            kfTransportedPos = Math::TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
+                                                         (Int_t)TrackPos.Charge);
 
             /* Reconstruct V0 */
 
-            lvTrackNeg = Math::PxPyPzMVector(kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
-                                             fPDG.GetParticle(pdgNegDaughter)->Mass());
-            lvTrackPos = Math::PxPyPzMVector(kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz(),  //
-                                             fPDG.GetParticle(pdgPosDaughter)->Mass());
+            lvTrackNeg = ROOT::Math::PxPyPzMVector(kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
+                                                   fPDG.GetParticle(pdgNegDaughter)->Mass());
+            lvTrackPos = ROOT::Math::PxPyPzMVector(kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz(),  //
+                                                   fPDG.GetParticle(pdgPosDaughter)->Mass());
             lvV0 = lvTrackNeg + lvTrackPos;
 
             /* Optimization: if `pdgV0 == -1`, use the same pi+pi- loop to process both K0S and pi+pi- coming from a signal reaction */
@@ -339,7 +289,8 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
                 if (mc_pdg_mother != pdgV0) continue;
 
                 InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
-                FillV0(1, esdIdxNeg, esdIdxPos, auxPdgV0, lvV0, kfV0, lvTrackNeg, lvTrackPos, Settings.IsMC);
+                Particle::V0 ThisV0(kfV0, lvV0, auxPdgV0, esdIdxNeg, lvTrackNeg, esdIdxPos, lvTrackPos);
+                FillV0(1, ThisV0);
                 /*
                 mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
                 mcIdxV0 = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
@@ -386,7 +337,7 @@ void AnalysisManager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter,
 /*
  *
  */
-void AnalysisManager::ProcessFindableSexaquarks() {
+void Manager::ProcessFindableSexaquarks() {
     //
     Int_t PdgCode_StruckNucleon = 2112;
     std::vector<Int_t> PdgCodes_FinalStateProducts = {-2212, 211, -211, 211};
@@ -422,7 +373,7 @@ void AnalysisManager::ProcessFindableSexaquarks() {
 /*
  *
  */
-void AnalysisManager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts) {
     //
     if (pdgReactionProducts.size() > 2) {
         KalmanSexaquarkFinder_TypeDE(pdgReactionProducts);
@@ -438,21 +389,21 @@ void AnalysisManager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<
 /*
  *
  */
-void AnalysisManager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts) {
     //
 }
 
 /*
  *
  */
-void AnalysisManager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts) {
     //
 }
 
 /*
  *
  */
-void AnalysisManager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts) {
     //
 }
 
@@ -463,7 +414,7 @@ void AnalysisManager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReaction
 /*
  *
  */
-void AnalysisManager::CleanContainers() {
+void Manager::CleanContainers() {
     //
     getMcEntry_fromMcIdx.clear();
     getPdgCode_fromMcIdx.clear();
@@ -496,7 +447,7 @@ void AnalysisManager::CleanContainers() {
 /*
  *
  */
-void AnalysisManager::EndOfEvent() {
+void Manager::EndOfEvent() {
     //
     DisconnectInjectedBranches();
     DisconnectMCBranches();
@@ -507,7 +458,7 @@ void AnalysisManager::EndOfEvent() {
 /*
  *
  */
-void AnalysisManager::EndOfAnalysis() {
+void Manager::EndOfAnalysis() {
     //
     DisconnectEventBranches();
     //
@@ -517,3 +468,6 @@ void AnalysisManager::EndOfAnalysis() {
         OutputFile->Write();
     }
 }
+
+}  // namespace Analysis
+}  // namespace Tree2Sexaquark

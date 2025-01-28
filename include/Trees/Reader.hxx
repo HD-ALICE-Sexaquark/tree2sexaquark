@@ -5,6 +5,8 @@
 
 #include "Trees/Input.hxx"
 
+namespace Tree2Sexaquark {
+
 class Reader {
    public:
     Reader() = default;
@@ -17,7 +19,7 @@ class Reader {
 
     void SetEventsTree(TTree* tree) { fTree_Events = tree; }
     TTree* GetEventsTree() { return fTree_Events; }
-    void ConnectEventBranches(Bool_t IsMC);
+    void ConnectEventBranches();
     void DisconnectEventBranches() {
         if (fTree_Events) fTree_Events->ResetBranchAddresses();
     }
@@ -54,5 +56,7 @@ class Reader {
     TTree* fTree_MC;
     TTree* fTree_Tracks;
 };
+
+}  // namespace Tree2Sexaquark
 
 #endif  // T2S_TREES_READER_HXX

@@ -1,5 +1,9 @@
 #include "Trees/Writer.hxx"
 
+#include "Analysis/Settings.hxx"
+
+namespace Tree2Sexaquark {
+
 /*         */
 /**  V0s  **/
 /*** === ***/
@@ -7,7 +11,7 @@
 /*
  *
  */
-void Writer::InitV0sBranches(Bool_t IsMC) {
+void Writer::InitV0sBranches() {
     fTree_V0s->Branch("Idx", &V0.Idx);
     fTree_V0s->Branch("Idx_Neg", &V0.Idx_Neg);
     fTree_V0s->Branch("Idx_Pos", &V0.Idx_Pos);
@@ -26,7 +30,7 @@ void Writer::InitV0sBranches(Bool_t IsMC) {
     fTree_V0s->Branch("Pos_Py", &V0.Pos_Py);
     fTree_V0s->Branch("Pos_Pz", &V0.Pos_Pz);
     /* True Information */
-    if (IsMC) {
+    if (Analysis::Settings::IsMC) {
         fTree_V0s->Branch("Idx_True", &V0.Idx_True);
         fTree_V0s->Branch("True_PdgCode", &V0.True_PdgCode);
         fTree_V0s->Branch("IsSecondary", &V0.IsSecondary);
@@ -39,34 +43,31 @@ void Writer::InitV0sBranches(Bool_t IsMC) {
 /*
  *
  */
-void Writer::FillV0(UInt_t idxV0, UInt_t esdIdxNegDau, UInt_t esdIdxPosDau, Int_t pdgV0, Math::PxPyPzEVector lvV0, KFParticle kfV0,
-                    Math::PxPyPzEVector lvNegDaughter, Math::PxPyPzEVector lvPosDaughter,  //
-                    Bool_t AnalysisMC, Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t ReactionID,
-                    Bool_t isHybrid) {
+void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
     V0.Idx = idxV0;
-    V0.Idx_Neg = esdIdxNegDau;
-    V0.Idx_Pos = esdIdxPosDau;
-    V0.PID = pdgV0;
-    V0.Px = (Float_t)lvV0.Px();
-    V0.Py = (Float_t)lvV0.Py();
-    V0.Pz = (Float_t)lvV0.Pz();
-    V0.E = (Float_t)lvV0.E();
-    V0.Xv = kfV0.GetX();
-    V0.Yv = kfV0.GetY();
-    V0.Zv = kfV0.GetZ();
-    V0.Neg_Px = (Float_t)lvNegDaughter.Px();
-    V0.Neg_Py = (Float_t)lvNegDaughter.Py();
-    V0.Neg_Pz = (Float_t)lvNegDaughter.Pz();
-    V0.Pos_Px = (Float_t)lvPosDaughter.Px();
-    V0.Pos_Py = (Float_t)lvPosDaughter.Py();
-    V0.Pos_Pz = (Float_t)lvPosDaughter.Pz();
-    if (AnalysisMC) {
-        V0.Idx_True = mcIdxV0;
-        V0.True_PdgCode = mcPdgCode;
-        V0.IsSecondary = isSecondary;
-        V0.IsSignal = isSignal;
-        V0.ReactionID = ReactionID;
-        V0.IsHybrid = isHybrid;
+    V0.Idx_Neg = thisV0.EsdIdxNeg;
+    V0.Idx_Pos = thisV0.EsdIdxNeg;
+    V0.PID = thisV0.PdgCode;
+    V0.Px = (Float_t)thisV0.Px();
+    V0.Py = (Float_t)thisV0.Py();
+    V0.Pz = (Float_t)thisV0.Pz();
+    V0.E = (Float_t)thisV0.E();
+    V0.Xv = thisV0.GetX();
+    V0.Yv = thisV0.GetY();
+    V0.Zv = thisV0.GetZ();
+    V0.Neg_Px = (Float_t)thisV0.NegPx();
+    V0.Neg_Py = (Float_t)thisV0.NegPy();
+    V0.Neg_Pz = (Float_t)thisV0.NegPz();
+    V0.Pos_Px = (Float_t)thisV0.PosPx();
+    V0.Pos_Py = (Float_t)thisV0.PosPy();
+    V0.Pos_Pz = (Float_t)thisV0.PosPz();
+    if (Analysis::Settings::IsMC) {
+        V0.Idx_True = thisV0.McIdxV0;
+        V0.True_PdgCode = thisV0.McPdgCode;
+        V0.IsSecondary = thisV0.IsSecondary;
+        V0.IsSignal = thisV0.IsSignal;
+        V0.ReactionID = thisV0.ReactionID;
+        V0.IsHybrid = thisV0.IsHybrid;
     }
     fTree_V0s->Fill();
 }
@@ -78,7 +79,7 @@ void Writer::FillV0(UInt_t idxV0, UInt_t esdIdxNegDau, UInt_t esdIdxPosDau, Int_
 /*
  *
  */
-void Writer::InitSexaquarkBranches_TypeA(Bool_t IsMC) {
+void Writer::InitSexaquarkBranches_TypeA() {
     std::vector<SexaquarkA_tt> Sexaquark = {Sexaquark_ALK0, Sexaquark_LK0};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALK0, fTree_Sexaquarks_LK0};
     for (Int_t i = 0; i < 2; i++) {
@@ -96,7 +97,7 @@ void Writer::InitSexaquarkBranches_TypeA(Bool_t IsMC) {
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
         /* -- True Information */
-        if (IsMC) {
+        if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
             Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
@@ -128,7 +129,7 @@ void Writer::InitSexaquarkBranches_TypeA(Bool_t IsMC) {
 /*
  *
  */
-void Writer::InitSexaquarkBranches_TypeD(Bool_t IsMC) {
+void Writer::InitSexaquarkBranches_TypeD() {
     std::vector<SexaquarkD_tt> Sexaquark = {Sexaquark_ALPK, Sexaquark_LNK};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPK, fTree_Sexaquarks_LNK};
     for (Int_t i = 0; i < 2; i++) {
@@ -146,7 +147,7 @@ void Writer::InitSexaquarkBranches_TypeD(Bool_t IsMC) {
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
         /* -- True Information */
-        if (IsMC) {
+        if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
             Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
@@ -175,7 +176,7 @@ void Writer::InitSexaquarkBranches_TypeD(Bool_t IsMC) {
 /*
  *
  */
-void Writer::InitSexaquarkBranches_TypeE(Bool_t IsMC) {
+void Writer::InitSexaquarkBranches_TypeE() {
     std::vector<SexaquarkE_tt> Sexaquark = {Sexaquark_ALPKPP, Sexaquark_LNKPP};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPKPP, fTree_Sexaquarks_LNKPP};
     for (Int_t i = 0; i < 2; i++) {
@@ -193,7 +194,7 @@ void Writer::InitSexaquarkBranches_TypeE(Bool_t IsMC) {
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
         /* -- True Information */
-        if (IsMC) {
+        if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
             Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
@@ -227,7 +228,7 @@ void Writer::InitSexaquarkBranches_TypeE(Bool_t IsMC) {
 /*
  *
  */
-void Writer::InitKaonPairBranches(Bool_t IsMC) {
+void Writer::InitKaonPairBranches() {
     std::vector<KaonPair_tt> Sexaquark = {Sexaquark_PKPKX, Sexaquark_NKNKX};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_PKPKX, fTree_Sexaquarks_NKNKX};
     for (Int_t i = 0; i < 2; i++) {
@@ -245,7 +246,7 @@ void Writer::InitKaonPairBranches(Bool_t IsMC) {
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
         /* -- True Information */
-        if (IsMC) {
+        if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
             Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
@@ -262,3 +263,5 @@ void Writer::InitKaonPairBranches(Bool_t IsMC) {
         Tree_Sexaquarks[i]->Branch("DCAkbSV", &Sexaquark[i].DCAkbSV);
     }
 }
+
+}  // namespace Tree2Sexaquark

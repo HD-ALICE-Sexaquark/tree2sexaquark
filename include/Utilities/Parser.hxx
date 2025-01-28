@@ -3,7 +3,7 @@
 
 #include "Utilities/CL1.hpp"
 
-#include "Analysis/Settings.hxx"
+namespace Tree2Sexaquark {
 
 /*
  *
@@ -16,12 +16,12 @@ class Parser {
     int Parse(int argc, char* argv[]);
     int ExitCode;
     bool HelpOrError;
-    Settings_tt GetSettings() { return Settings; }
 
    private:
     void AddOptions();
     CLI::App CLI_APP;
-    Settings_tt Settings;
 };
+
+}  // namespace Tree2Sexaquark
 
 #endif  // T2S_PARSER_HXX

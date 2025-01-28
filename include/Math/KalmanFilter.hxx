@@ -9,13 +9,13 @@
 
 #include "Trees/Input.hxx"
 
-// namespace Tree2Sexaquark::Math {
+namespace Tree2Sexaquark {
+namespace Math {
 
 KFParticle CreateKFParticle(Track_tt track, Double_t mass);
 KFVertex CreateKFVertex(Double_t* XYZ, Double_t* CovarianceMatrix);
 KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t massThis, Int_t chargeThis);
 
-// }  // namespace Tree2Sexaquark::Math
 /*
 class KFParticleMother : public KFParticle {
    public:
@@ -25,4 +25,8 @@ class KFParticleMother : public KFParticle {
     }
 };
 */
+
+}  // namespace Math
+}  // namespace Tree2Sexaquark
+
 #endif  // T2S_KALMAN_FILTER_HXX

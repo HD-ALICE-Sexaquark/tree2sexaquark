@@ -1,10 +1,14 @@
 #include "Utilities/Parser.hxx"
 
+#include "Analysis/Settings.hxx"
+
+namespace Tree2Sexaquark {
+
 /*
  * Default constructor
  */
 Parser::Parser()  //
-    : ExitCode(0), HelpOrError(false), CLI_APP(""), Settings() {
+    : ExitCode(0), HelpOrError(false), CLI_APP("") {
     //
     AddOptions();
 }
@@ -13,7 +17,7 @@ Parser::Parser()  //
  * Default constructor (with arguments)
  */
 Parser::Parser(std::string app_description)  //
-    : ExitCode(0), HelpOrError(false), CLI_APP(app_description), Settings() {
+    : ExitCode(0), HelpOrError(false), CLI_APP(app_description) {
     //
     AddOptions();
 }
@@ -24,15 +28,15 @@ Parser::Parser(std::string app_description)  //
 void Parser::AddOptions() {
     //
     CLI_APP
-        .add_option("-i,--input", Settings.PathInputFile, "Path of input file")  //
+        .add_option("-i,--input", Analysis::Settings::PathInputFile, "Path of input file")  //
         ->required()
         ->check(CLI::ExistingPath);
-    Settings.PathOutputFile = "./SexaquarkResults.root";  // default
-    CLI_APP.add_option("-o,--output", Settings.PathOutputFile, "Path of output file");
-    CLI_APP.add_flag("-m,--mc", Settings.IsMC, "Flag to process MC");
-    CLI_APP.add_flag("-s,--signal", Settings.IsSignalMC, "Flag to process Signal MC");
+    Analysis::Settings::PathOutputFile = "./SexaquarkResults.root";  // default
+    CLI_APP.add_option("-o,--output", Analysis::Settings::PathOutputFile, "Path of output file");
+    CLI_APP.add_flag("-m,--mc", Analysis::Settings::IsMC, "Flag to process MC");
+    CLI_APP.add_flag("-s,--signal", Analysis::Settings::IsSignalMC, "Flag to process Signal MC");
     CLI_APP
-        .add_option("-n,--nevents", Settings.LimitToNEvents, "Limit to N events")  //
+        .add_option("-n,--nevents", Analysis::Settings::LimitToNEvents, "Limit to N events")  //
         ->check(CLI::NonNegativeNumber & CLI::TypeValidator<unsigned int>());
 }
 
@@ -50,3 +54,5 @@ int Parser::Parse(int argc, char* argv[]) {
     }
     return 0;
 }
+
+}  // namespace Tree2Sexaquark

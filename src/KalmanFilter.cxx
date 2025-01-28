@@ -2,7 +2,8 @@
 
 #include "Math/KalmanFilter.hxx"
 
-// namespace Tree2Sexaquark::Math {
+namespace Tree2Sexaquark {
+namespace Math {
 /*
  * Correct initialization of a KFParticle.
  * (Copied from (https://github.com/alisw/AliPhysics)/PWGLF/.../AliAnalysisTaskDoubleHypNucTree.cxx`)
@@ -103,4 +104,6 @@ KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t m
 
     return kfTransported;
 }
-// }  // namespace Tree2Sexaquark::Math
+
+}  // namespace Math
+}  // namespace Tree2Sexaquark
