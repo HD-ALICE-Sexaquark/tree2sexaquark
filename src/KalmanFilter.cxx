@@ -4,6 +4,7 @@
 
 namespace Tree2Sexaquark {
 namespace Math {
+
 /*
  * Correct initialization of a KFParticle.
  * (Copied from (https://github.com/alisw/AliPhysics)/PWGLF/.../AliAnalysisTaskDoubleHypNucTree.cxx`)

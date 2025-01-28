@@ -14,6 +14,7 @@
 #include "Utilities/Logger.hxx"
 
 #include "Analysis/Settings.hxx"
+#include "Cuts/Inspector.hxx"
 #include "Trees/Reader.hxx"
 #include "Trees/Writer.hxx"
 
@@ -97,6 +98,9 @@ class Manager : public Reader, public Writer {
     void KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts);
     void KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts);
     void KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts);
+
+    /* Cuts */
+    Cuts::Inspector Inspector;
 
     /* Related to Containers */
     /* -- filled at `ProcessMCParticles()` */

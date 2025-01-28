@@ -6,9 +6,11 @@ target_link_libraries(App
     KalmanFilter
     Reader
     Writer
+    Inspector
     V0
     Parser
     Settings
+    Common
     Logger
     KFParticle::KFParticle
     ROOT::EG

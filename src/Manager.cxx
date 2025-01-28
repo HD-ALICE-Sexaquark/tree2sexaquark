@@ -38,6 +38,8 @@ Bool_t Manager::OpenInputFile() {
     SetEventsTree(EventsTree);
     ConnectEventBranches();
 
+    Inspector.Init();
+
     return kTRUE;
 }
 
@@ -288,9 +290,6 @@ void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t p
                 if (!GetPdgCode(mc_neg_mc_mother, mc_pdg_mother)) continue;
                 if (mc_pdg_mother != pdgV0) continue;
 
-                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
-                Particle::V0 ThisV0(kfV0, lvV0, auxPdgV0, esdIdxNeg, lvTrackNeg, esdIdxPos, lvTrackPos);
-                FillV0(1, ThisV0);
                 /*
                 mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
                 mcIdxV0 = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
@@ -319,12 +318,13 @@ void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t p
                             is_hybrid = (isMcIdxSignal[mcIdxNeg] || isMcIdxSignal[mcIdxPos]) && !is_signal;
                 */
                 /* Apply cuts and store V0 */
-                /*
-                if (PassesV0CutsAs(auxPdgV0, kfV0, kfDaughterNeg, kfDaughterPos, lvV0, lvTrackNeg, lvTrackPos, is_true, is_secondary, is_signal)) {
-                    StoreV0As(auxPdgV0, kfV0, kfDaughterNeg, kfDaughterPos, lvV0, lvTrackNeg, lvTrackPos, esdIdxNeg, esdIdxPos, mcIdxV0, mc_pdg_code,
-                              is_true, is_secondary, is_signal, reaction_id, is_hybrid);
-                }
-                */
+
+                Particle::V0 ThisV0(kfV0, lvV0, auxPdgV0, esdIdxNeg, lvTrackNeg, esdIdxPos, lvTrackPos);
+
+                if (!Inspector.Approve(ThisV0)) continue;
+
+                FillV0(1, ThisV0);
+                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
             }
         }  // end of loop over pos. tracks
     }      // end of loop over neg. tracks

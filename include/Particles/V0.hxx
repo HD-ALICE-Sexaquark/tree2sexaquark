@@ -1,7 +1,6 @@
 #ifndef T2S_V0S_HXX
 #define T2S_V0S_HXX
 
-// ROOT::Math libraries
 #include "Math/Vector4D.h"
 
 #ifndef HomogeneousField
@@ -26,6 +25,9 @@ class V0 : public KFParticle {
     inline Double_t Py() { return lvV0.Py(); }
     inline Double_t Pz() { return lvV0.Pz(); }
     inline Double_t E() { return lvV0.E(); }
+    inline Double_t Eta() { return lvV0.Eta(); }
+    inline Double_t Pt() { return lvV0.Pt(); }
+    inline Double_t Mass() { return lvV0.M(); }
 
     inline Double_t NegPx() { return lvNeg.Px(); }
     inline Double_t NegPy() { return lvNeg.Py(); }
