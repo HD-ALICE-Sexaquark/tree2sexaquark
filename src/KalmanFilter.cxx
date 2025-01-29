@@ -1,6 +1,6 @@
-#include "TMath.h"
-
 #include "Math/KalmanFilter.hxx"
+
+#include "TMath.h"
 
 namespace Tree2Sexaquark {
 namespace Math {

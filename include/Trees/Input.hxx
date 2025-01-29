@@ -108,7 +108,7 @@ struct Track_tt {
     // TBits TPCFitMap;             //
     // TBits TPCClusterMap;         //
     // TBits TPCSharedMap;          //
-    Int_t Idx_True;  //
+    UInt_t Idx_True;  //
 };
 
 #endif  // T2S_INPUT_TREES_STRUCTURE_HXX

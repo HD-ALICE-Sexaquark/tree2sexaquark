@@ -52,9 +52,9 @@ void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
     V0.Py = (Float_t)thisV0.Py();
     V0.Pz = (Float_t)thisV0.Pz();
     V0.E = (Float_t)thisV0.E();
-    V0.Xv = thisV0.GetX();
-    V0.Yv = thisV0.GetY();
-    V0.Zv = thisV0.GetZ();
+    V0.Xv = (Float_t)thisV0.Xv();
+    V0.Yv = (Float_t)thisV0.Yv();
+    V0.Zv = (Float_t)thisV0.Zv();
     V0.Neg_Px = (Float_t)thisV0.NegPx();
     V0.Neg_Py = (Float_t)thisV0.NegPy();
     V0.Neg_Pz = (Float_t)thisV0.NegPz();

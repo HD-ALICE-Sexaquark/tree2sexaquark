@@ -11,6 +11,11 @@
 #include "TFile.h"
 #include "TString.h"
 
+#ifndef HomogeneousField
+#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
+#endif
+#include "KFVertex.h"
+
 #include "Utilities/Logger.hxx"
 
 #include "Analysis/Settings.hxx"
@@ -29,34 +34,11 @@ class Manager : public Reader, public Writer {
     Bool_t OpenInputFile();
     Bool_t PrepareOutputFile();
 
+    /* Events */
+    Bool_t GetEvent(Long64_t evt_idx);
     inline Long64_t GetN_Events() {
         if (!Settings::LimitToNEvents) return GetEventsTree()->GetEntries();
         return Settings::LimitToNEvents;
-    }
-
-    inline Bool_t GetEvent(Long64_t evt_idx) {
-        if (!ReadEvent(evt_idx)) {
-            DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
-            return kFALSE;
-        }
-        if (Settings::IsMC) {
-            if (Settings::IsSignalMC)
-                Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
-            else
-                Event_UID = TString::Format("BKG_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
-        } else {
-            Event_UID = TString::Format("DATA_%6u_%03u_%u_%03u", Event.RunNumber, Event.DirNumber, Event.DirNumberB, Event.EventNumber);
-        }
-        InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
-        InfoF(">> Centrality = %f, PV = (%f, %f, %f), B = %f", Event.Centrality, Event.PV_Xv, Event.PV_Yv, Event.PV_Zv, Event.MagneticField);
-
-        Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
-        if (!Event_Dir) {
-            DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
-            return kFALSE;
-        }
-
-        return kTRUE;
     }
 
     inline TTree* FindTreeInFile(TString tree_name) {
@@ -90,7 +72,7 @@ class Manager : public Reader, public Writer {
 
     /* V0s */
     void ProcessFindableV0s();
-    void KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0 = -1);
+    void KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0 = -1);
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
@@ -133,10 +115,10 @@ class Manager : public Reader, public Writer {
         mcIndices = getMcIndices_fromReactionID[reactionID];
         return kTRUE;
     }
-    inline Bool_t GetMotherMcIdx(UInt_t mcIdx, UInt_t& motherMcIdx) {
+    inline Bool_t GetMotherMcIdx(UInt_t mcIdx, UInt_t& mcIdxMother) {
         if (getMotherMcIdx_fromMcIdx.find(mcIdx) == getMotherMcIdx_fromMcIdx.end()) return kFALSE;
         if (getMotherMcIdx_fromMcIdx[mcIdx] == -1) return kFALSE;
-        motherMcIdx = getMotherMcIdx_fromMcIdx[mcIdx];
+        mcIdxMother = getMotherMcIdx_fromMcIdx[mcIdx];
         return kTRUE;
     }
     inline Bool_t GetAncestorMcIdx(UInt_t mcIdx, UInt_t& ancestorMcIdx) {
@@ -197,6 +179,7 @@ class Manager : public Reader, public Writer {
     /* -- Event */
     TString Event_UID;
     std::unique_ptr<TDirectoryFile> Event_Dir;
+    KFVertex kfPrimaryVertex;  // primary vertex
 
     /* ROOT Objects */
     TDatabasePDG fPDG;
@@ -207,10 +190,10 @@ class Manager : public Reader, public Writer {
     std::unordered_map<UInt_t, Int_t> getPdgCode_fromMcIdx;                       // key: `mcIdx`
     std::unordered_map<UInt_t, Bool_t> isMcIdxSignal;                             // key: `mcIdx`
     std::unordered_map<UInt_t, Bool_t> isMcIdxSecondary;                          // key: `mcIdx`
-    std::unordered_map<UInt_t, UInt_t> getReactionID_fromMcIdx;                   // key: `mcIdx`
+    std::unordered_map<UInt_t, Int_t> getReactionID_fromMcIdx;                    // key: `mcIdx`
     std::unordered_map<UInt_t, std::vector<UInt_t>> getMcIndices_fromReactionID;  // key: `ReactionID`
-    std::unordered_map<UInt_t, UInt_t> getMotherMcIdx_fromMcIdx;                  // key: `mcIdx`
-    std::unordered_map<UInt_t, UInt_t> getAncestorMcIdx_fromMcIdx;                // key: `mcIdx`
+    std::unordered_map<UInt_t, Int_t> getMotherMcIdx_fromMcIdx;                   // key: `mcIdx`
+    std::unordered_map<UInt_t, Int_t> getAncestorMcIdx_fromMcIdx;                 // key: `mcIdx`
     std::unordered_map<UInt_t, UInt_t> getNegDauMcIdx_fromMcIdx;                  // key: `mcIdx`
     std::unordered_map<UInt_t, UInt_t> getPosDauMcIdx_fromMcIdx;                  // key: `mcIdx`
     /* -- filled at `ProcessTracks()` */

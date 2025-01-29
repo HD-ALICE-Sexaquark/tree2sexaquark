@@ -2,17 +2,9 @@
 
 #include <unordered_set>
 
-// ROOT::Math libraries
-#include "Math/Point3D.h"
-#include "Math/Vector3D.h"
 #include "Math/Vector4D.h"
-#include "Math/VectorUtil.h"
 
-#ifndef HomogeneousField
-#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
-#endif
 #include "KFParticle.h"
-#include "KFVertex.h"
 
 #include "Math/KalmanFilter.hxx"
 #include "Particles/V0.hxx"
@@ -64,6 +56,44 @@ Bool_t Manager::PrepareOutputFile() {
 /*
  *
  */
+Bool_t Manager::GetEvent(Long64_t evt_idx) {
+    //
+    if (!ReadEvent(evt_idx)) {
+        DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
+        return kFALSE;
+    }
+    if (Settings::IsMC) {
+        if (Settings::IsSignalMC)
+            Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+        else
+            Event_UID = TString::Format("MC_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+    } else {
+        Event_UID = TString::Format("DATA_%6u_%03u_%u_%03u", Event.RunNumber, Event.DirNumber, Event.DirNumberB, Event.EventNumber);
+    }
+    InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
+    // InfoF(">> Centrality = %f, PV = (%f, %f, %f), B = %f", Event.Centrality, Event.PV_Xv, Event.PV_Yv, Event.PV_Zv, Event.MagneticField);
+
+    Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
+    if (!Event_Dir) {
+        DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
+        return kFALSE;
+    }
+
+    /* Set Event Properties */
+    /* -- Magnetic Field */
+    KFParticle::SetField(Event.MagneticField);
+    /* -- Primary Vertex */
+    Float_t XYZ[3] = {Event.PV_Xv, Event.PV_Yv, Event.PV_Zv};
+    Float_t CovMatrix[6] = {Event.PV_CovMatrix[0], Event.PV_CovMatrix[1], Event.PV_CovMatrix[2],
+                            Event.PV_CovMatrix[3], Event.PV_CovMatrix[4], Event.PV_CovMatrix[5]};
+    kfPrimaryVertex = Math::CreateKFVertex(XYZ, CovMatrix);
+
+    return kTRUE;
+}
+
+/*
+ *
+ */
 void Manager::ProcessInjected() {
     //
     TTree* InjectedTree = FindTreeInEventDir("Injected");
@@ -96,8 +126,12 @@ void Manager::ProcessMCParticles() {
         getPdgCode_fromMcIdx[MC.Idx] = MC.PdgCode;
         isMcIdxSignal[MC.Idx] = MC.Generator == 2 && MC.Idx_Ancestor == -1;
         isMcIdxSecondary[MC.Idx] = MC.IsSecFromMat || MC.IsSecFromWeak || isMcIdxSignal[MC.Idx];
-        getReactionID_fromMcIdx[MC.Idx] = MC.ReactionID;
-        getMcIndices_fromReactionID[MC.ReactionID].push_back(MC.Idx);
+        if (isMcIdxSignal[MC.Idx]) {
+            getReactionID_fromMcIdx[MC.Idx] = MC.ReactionID;
+            getMcIndices_fromReactionID[MC.ReactionID].push_back(MC.Idx);
+        } else {
+            getReactionID_fromMcIdx[MC.Idx] = -1;
+        }
         getMotherMcIdx_fromMcIdx[MC.Idx] = MC.Idx_Mother;
         getAncestorMcIdx_fromMcIdx[MC.Idx] = MC.Idx_Ancestor;
         if (MC.Idx_Mother >= 0) {
@@ -106,8 +140,9 @@ void Manager::ProcessMCParticles() {
         }
         if (MC.PdgCode == 310 || TMath::Abs(MC.PdgCode) == 3122) mcIndicesOfTrueV0s.push_back(MC.Idx);
         /*  */
-        if (MC.Generator != 2 || MC.Idx_Ancestor != -1) continue;
-        // InfoF("%i, %i, %i, %i, %i", MC.Idx, MC.Idx_Mother, MC.Idx_Ancestor, MC.PdgCode, MC.ReactionID);
+        // if (isMcIdxSignal[MC.Idx]) continue;
+        // InfoF("entry=%lld, mcIdx=%u, pdg=%i, primary=%i, secfrommat=%i, secfromweak=%i, mother=%i, ancestor=%i",  //
+        //   mc_entry, MC.Idx, MC.PdgCode, MC.IsPrimary, MC.IsSecFromMat, MC.IsSecFromWeak, MC.Idx_Mother, MC.Idx_Ancestor);
     }
 }
 
@@ -163,9 +198,8 @@ void Manager::ProcessTracks() {
  */
 void Manager::ProcessFindableV0s() {
     //
-    Int_t V0_PdgCode;
+    Int_t V0_PdgCode, Neg_PdgCode, Pos_PdgCode;
     UInt_t Neg_McIdx, Pos_McIdx;
-    Int_t Neg_PdgCode, Pos_PdgCode;
     UInt_t Neg_EsdIdx, Pos_EsdIdx;
 
     for (UInt_t& V0_McIdx : mcIndicesOfTrueV0s) {
@@ -189,22 +223,20 @@ void Manager::ProcessFindableV0s() {
  * Find all V0s via Kalman Filter.
  * Note: if `pdgV0 == -1` (default value), it will store K0S candidates and secondary pion pairs.
  */
-void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t pdgV0) {
-
-    KFParticle::SetField(Event.MagneticField);
+void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
 
     Track_tt TrackNeg, TrackPos;
-    Int_t mcIdxNeg, mcIdxPos;
+    UInt_t mcIdxNeg, mcIdxPos;
     Int_t mcIdxV0;
 
     /* Declare KFParticle objects */
 
-    KFParticle kfDaughterNeg, kfDaughterPos;
+    KFParticle kfNeg, kfPos;
     KFParticle kfTransportedNeg, kfTransportedPos;
 
     /* Declare 4-momentum vectors */
 
-    ROOT::Math::PxPyPzEVector lvTrackNeg, lvTrackPos;
+    ROOT::Math::PxPyPzEVector lvNeg, lvPos;
     ROOT::Math::PxPyPzEVector lvV0;
 
     /* Information from MC */
@@ -246,49 +278,47 @@ void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t p
 
             /* Kalman Filter */
 
-            kfDaughterNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNegDaughter)->Mass());
-            kfDaughterPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPosDaughter)->Mass());
+            kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNeg)->Mass());
+            kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPos)->Mass());
 
             KFParticle kfV0;
-            kfV0.AddDaughter(kfDaughterNeg);
-            kfV0.AddDaughter(kfDaughterPos);
+            kfV0.AddDaughter(kfNeg);
+            kfV0.AddDaughter(kfPos);
 
             /* Transport V0 and daughters */
 
             kfV0.TransportToDecayVertex();
-            kfTransportedNeg = Math::TransportKFParticle(kfDaughterNeg, kfDaughterPos, fPDG.GetParticle(pdgNegDaughter)->Mass(),  //
+            kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdgNeg)->Mass(),  //
                                                          (Int_t)TrackNeg.Charge);
-            kfTransportedPos = Math::TransportKFParticle(kfDaughterPos, kfDaughterNeg, fPDG.GetParticle(pdgPosDaughter)->Mass(),  //
+            kfTransportedPos = Math::TransportKFParticle(kfPos, kfNeg, fPDG.GetParticle(pdgPos)->Mass(),  //
                                                          (Int_t)TrackPos.Charge);
 
             /* Reconstruct V0 */
 
-            lvTrackNeg = ROOT::Math::PxPyPzMVector(kfDaughterNeg.Px(), kfDaughterNeg.Py(), kfDaughterNeg.Pz(),  //
-                                                   fPDG.GetParticle(pdgNegDaughter)->Mass());
-            lvTrackPos = ROOT::Math::PxPyPzMVector(kfDaughterPos.Px(), kfDaughterPos.Py(), kfDaughterPos.Pz(),  //
-                                                   fPDG.GetParticle(pdgPosDaughter)->Mass());
-            lvV0 = lvTrackNeg + lvTrackPos;
+            lvNeg = ROOT::Math::PxPyPzMVector(kfNeg.Px(), kfNeg.Py(), kfNeg.Pz(), fPDG.GetParticle(pdgNeg)->Mass());
+            lvPos = ROOT::Math::PxPyPzMVector(kfPos.Px(), kfPos.Py(), kfPos.Pz(), fPDG.GetParticle(pdgPos)->Mass());
+            lvV0 = lvNeg + lvPos;
 
             /* Optimization: if `pdgV0 == -1`, use the same pi+pi- loop to process both K0S and pi+pi- coming from a signal reaction */
 
             std::vector<Int_t> pdgV0s = {pdgV0};
-            if (pdgV0 == -1) pdgV0s = {422, 310};
+            if (pdgV0 == -1) pdgV0s = {310, 422};
 
             for (Int_t& auxPdgV0 : pdgV0s) {
 
                 /* Collect true information */
 
-                UInt_t mc_neg, mc_pos;
                 UInt_t mc_neg_mc_mother, mc_pos_mc_mother;
                 Int_t mc_pdg_mother;
-                if (!GetMcIdx(esdIdxNeg, mc_neg) || !GetMcIdx(esdIdxPos, mc_pos)) continue;
-                if (!GetMotherMcIdx(mc_neg, mc_neg_mc_mother) || !GetMotherMcIdx(mc_pos, mc_pos_mc_mother)) continue;
+
+                if (!GetMcIdx(esdIdxNeg, mcIdxNeg) || !GetMcIdx(esdIdxPos, mcIdxPos)) continue;
+                if (!GetMotherMcIdx(mcIdxNeg, mc_neg_mc_mother) || !GetMotherMcIdx(mcIdxPos, mc_pos_mc_mother)) continue;
 
                 /* DEBUG: select only true V0s */
 
                 if (mc_neg_mc_mother != mc_pos_mc_mother) continue;
                 if (!GetPdgCode(mc_neg_mc_mother, mc_pdg_mother)) continue;
-                if (mc_pdg_mother != pdgV0) continue;
+                if (mc_pdg_mother != auxPdgV0) continue;
 
                 /*
                 mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
@@ -319,12 +349,14 @@ void Manager::KalmanV0Finder(Int_t pdgNegDaughter, Int_t pdgPosDaughter, Int_t p
                 */
                 /* Apply cuts and store V0 */
 
-                Particle::V0 ThisV0(kfV0, lvV0, auxPdgV0, esdIdxNeg, lvTrackNeg, esdIdxPos, lvTrackPos);
+                Particle::V0 ThisV0(auxPdgV0, esdIdxNeg, esdIdxPos,  //
+                                    lvV0, lvNeg, lvPos,              //
+                                    kfV0, kfTransportedNeg, kfTransportedPos, kfPrimaryVertex);
 
                 if (!Inspector.Approve(ThisV0)) continue;
 
                 FillV0(1, ThisV0);
-                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mc_neg, mc_pos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
+                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mcIdxNeg, mcIdxPos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
             }
         }  // end of loop over pos. tracks
     }      // end of loop over neg. tracks
