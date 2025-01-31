@@ -30,7 +30,16 @@ Bool_t Manager::OpenInputFile() {
     SetEventsTree(EventsTree);
     ConnectEventBranches();
 
-    Inspector.Init();
+    Inspector.SetLambdaDefaultCuts();
+    Inspector.SetKaonZeroDefaultCuts();
+    Inspector.SetPionPairDefaultCuts();
+
+    Inspector.SetSexaquarkDefaultCuts_ChannelA();
+    Inspector.SetSexaquarkDefaultCuts_ChannelD();
+    Inspector.SetSexaquarkDefaultCuts_ChannelE();
+    Inspector.SetKaonPairDefaultCuts();
+
+    Inspector.PrintAllCuts();
 
     return kTRUE;
 }

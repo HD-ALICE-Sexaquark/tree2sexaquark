@@ -5,31 +5,29 @@
 
 #include "Rtypes.h"
 
+#include "Utilities/Constants.hxx"
 #include "Utilities/Logger.hxx"
 
-#include "Particles/V0.hxx"
+#include "Particles/Base.hxx"
 
 namespace Tree2Sexaquark {
+namespace Cuts {
 
 /*
  * Container for a cut expression and its limits.
  */
+template <typename T>
 class Cut {
    public:
-    enum Option_t {  //
-        kMinimum,
-        kMaximum,
-        kAbsoluteMax
-    };
-
-    Cut() = default;
-    ~Cut() = default; /* This constructor requires expression and limits to be set later */
+    Cut() = default; /* This constructor requires expression and limits to be set later */
+    ~Cut() = default;
 
     /*
      * Set expression, but limits need to be set later
      */
-    Cut(std::function<Float_t(Particle::V0)> expression)
-        : fExpression(expression),  //
+    Cut(TString name, std::function<Float_t(T)> expression)
+        : fName(name),  //
+          fExpression(expression),
           fMinimum(0),
           fMinDefined(kFALSE),
           fMaximum(0),
@@ -38,8 +36,9 @@ class Cut {
     /*
      * Set expression, min and max
      */
-    Cut(std::function<Float_t(Particle::V0)> expression, Float_t min, Float_t max)
-        : fExpression(expression),  //
+    Cut(TString name, std::function<Float_t(T)> expression, Float_t min, Float_t max)
+        : fName(name),  //
+          fExpression(expression),
           fMinimum(min),
           fMinDefined(kTRUE),
           fMaximum(max),
@@ -48,8 +47,9 @@ class Cut {
     /*
      * Sets expression and single value, which can be min., max. or abs. max.
      */
-    Cut(std::function<Float_t(Particle::V0)> expression, Float_t value, Option_t option)
-        : fExpression(expression),  //
+    Cut(TString name, std::function<Float_t(T)> expression, Float_t value, Option_t option)
+        : fName(name),  //
+          fExpression(expression),
           fMinimum(0),
           fMinDefined(kFALSE),
           fMaximum(0),
@@ -58,30 +58,36 @@ class Cut {
         SetLimit(value, option);
     }
 
-    void SetExpression(std::function<Float_t(Particle::V0)> expression) { fExpression = expression; }
+    void SetExpression(std::function<Float_t(T)> expression) { fExpression = expression; }
+
     void SetLimit(Float_t value, Option_t option) {
         if (option == kAbsoluteMax) SetAbsMax(value);
         if (option == kMinimum) SetMin(value);
         if (option == kMaximum) SetMax(value);
     }
+
     void SetMinMax(Float_t min, Float_t max) {
         SetMin(min);
         SetMax(max);
     }
+
     void SetAbsMax(Float_t value) {
         SetMin(-value);
         SetMax(value);
     }
+
     void SetMin(Float_t value) {
         fMinimum = value;
         fMinDefined = kTRUE;
     }
+
     void SetMax(Float_t value) {
         fMaximum = value;
         fMaxDefined = kTRUE;
     }
 
-    Bool_t Check(Particle::V0 thisV0) {
+    Bool_t Check(T particle) const {
+        //
         if (!fExpression) {
             ErrorF("Expression not defined! %s", "");
             return kFALSE;
@@ -91,21 +97,35 @@ class Cut {
             return kFALSE;
         }
         /*  */
-        Float_t eval = fExpression(thisV0);
+        Float_t eval = fExpression(particle);
         Bool_t result = kTRUE;
         if (fMinDefined) result = result && eval > fMinimum;
         if (fMaxDefined) result = result && eval < fMaximum;
         return result;
     }
 
+    void Print() {
+        //
+        if (fMinDefined && fMaxDefined)
+            InfoF("%s BETWEEN %f AND %f", fName.Data(), fMinimum, fMaximum);
+        else if (fMinDefined)
+            InfoF("%s GREATER THAN %f", fName.Data(), fMinimum);
+        else if (fMaxDefined)
+            InfoF("%s LESS THAN %f", fName.Data(), fMaximum);
+        else
+            ErrorF("No limits defined! %s", "");
+    }
+
    private:
-    std::function<Float_t(Particle::V0)> fExpression;
+    TString fName;
+    std::function<Float_t(T)> fExpression;
     Float_t fMinimum;
     Bool_t fMinDefined;
     Float_t fMaximum;
     Bool_t fMaxDefined;
 };
 
+}  // namespace Cuts
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_CUTS_HXX

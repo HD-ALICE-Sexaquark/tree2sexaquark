@@ -12,6 +12,7 @@ namespace Tree2Sexaquark {
  *
  */
 void Writer::InitV0sBranches() {
+    //
     fTree_V0s->Branch("Idx", &V0.Idx);
     fTree_V0s->Branch("Idx_Neg", &V0.Idx_Neg);
     fTree_V0s->Branch("Idx_Pos", &V0.Idx_Pos);
@@ -44,6 +45,7 @@ void Writer::InitV0sBranches() {
  *
  */
 void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
+    //
     V0.Idx = idxV0;
     V0.Idx_Neg = thisV0.EsdIdxNeg;
     V0.Idx_Pos = thisV0.EsdIdxNeg;
@@ -52,9 +54,9 @@ void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
     V0.Py = (Float_t)thisV0.Py();
     V0.Pz = (Float_t)thisV0.Pz();
     V0.E = (Float_t)thisV0.E();
-    V0.Xv = (Float_t)thisV0.Xv();
-    V0.Yv = (Float_t)thisV0.Yv();
-    V0.Zv = (Float_t)thisV0.Zv();
+    V0.Xv = thisV0.Xv();
+    V0.Yv = thisV0.Yv();
+    V0.Zv = thisV0.Zv();
     V0.Neg_Px = (Float_t)thisV0.NegPx();
     V0.Neg_Py = (Float_t)thisV0.NegPy();
     V0.Neg_Pz = (Float_t)thisV0.NegPz();
@@ -80,6 +82,7 @@ void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
  *
  */
 void Writer::InitSexaquarkBranches_TypeA() {
+    //
     std::vector<SexaquarkA_tt> Sexaquark = {Sexaquark_ALK0, Sexaquark_LK0};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALK0, fTree_Sexaquarks_LK0};
     for (Int_t i = 0; i < 2; i++) {
@@ -130,6 +133,7 @@ void Writer::InitSexaquarkBranches_TypeA() {
  *
  */
 void Writer::InitSexaquarkBranches_TypeD() {
+    //
     std::vector<SexaquarkD_tt> Sexaquark = {Sexaquark_ALPK, Sexaquark_LNK};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPK, fTree_Sexaquarks_LNK};
     for (Int_t i = 0; i < 2; i++) {
@@ -177,6 +181,7 @@ void Writer::InitSexaquarkBranches_TypeD() {
  *
  */
 void Writer::InitSexaquarkBranches_TypeE() {
+    //
     std::vector<SexaquarkE_tt> Sexaquark = {Sexaquark_ALPKPP, Sexaquark_LNKPP};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPKPP, fTree_Sexaquarks_LNKPP};
     for (Int_t i = 0; i < 2; i++) {
@@ -229,6 +234,7 @@ void Writer::InitSexaquarkBranches_TypeE() {
  *
  */
 void Writer::InitKaonPairBranches() {
+    //
     std::vector<KaonPair_tt> Sexaquark = {Sexaquark_PKPKX, Sexaquark_NKNKX};
     std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_PKPKX, fTree_Sexaquarks_NKNKX};
     for (Int_t i = 0; i < 2; i++) {
