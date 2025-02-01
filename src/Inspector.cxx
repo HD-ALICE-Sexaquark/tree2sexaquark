@@ -1,41 +1,70 @@
 #include "Cuts/Inspector.hxx"
 
 #include "Cuts/Default.hxx"
-#include "Particles/Sexaquark.hxx"
 #include "Particles/V0.hxx"
 
 namespace Tree2Sexaquark {
 namespace Cuts {
+
+/*  */
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelA::MemFn expression, Double_t value, Limit limit_type) {
+    Cut<Sexaquark::ChannelA> cut(name, expression, value, limit_type);
+    fCuts_ChannelA.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelD::MemFn expression, Double_t value, Limit limit_type) {
+    Cut<Sexaquark::ChannelD> cut(name, expression, value, limit_type);
+    fCuts_ChannelD.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelE::MemFn expression, Double_t value, Limit limit_type) {
+    Cut<Sexaquark::ChannelE> cut(name, expression, value, limit_type);
+    fCuts_ChannelE.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::KaonPair::MemFn expression, Double_t value, Limit limit_type) {
+    Cut<Sexaquark::KaonPair> cut(name, expression, value, limit_type);
+    fCuts_KaonPair.push_back(cut);
+}
+/*  */
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelA::MemFn expression, Double_t min, Double_t max) {
+    Cut<Sexaquark::ChannelA> cut(name, expression, min, max);
+    fCuts_ChannelA.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelD::MemFn expression, Double_t min, Double_t max) {
+    Cut<Sexaquark::ChannelD> cut(name, expression, min, max);
+    fCuts_ChannelD.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::ChannelE::MemFn expression, Double_t min, Double_t max) {
+    Cut<Sexaquark::ChannelE> cut(name, expression, min, max);
+    fCuts_ChannelE.push_back(cut);
+}
+template <>
+void Inspector::AddCut(TString name, Sexaquark::KaonPair::MemFn expression, Double_t min, Double_t max) {
+    Cut<Sexaquark::KaonPair> cut(name, expression, min, max);
+    fCuts_KaonPair.push_back(cut);
+}
 
 /*
  *
  */
 void Inspector::SetLambdaDefaultCuts() {
     //
-    AddCut(
-        kLambda, "eta", [](Particle::V0 thisV0) { return (Float_t)thisV0.Eta(); }, Default::Lambda_AbsMaxEta, Cuts::kAbsoluteMax);
-    AddCut(
-        kLambda, "pt", [](Particle::V0 thisV0) { return (Float_t)thisV0.Pt(); }, Default::Lambda_MinPt, Cuts::kMinimum);
-    AddCut(
-        kLambda, "mass", [](Particle::V0 thisV0) { return (Float_t)thisV0.Mass(); }, Default::Lambda_MinMass, Default::Lambda_MaxMass);
-    AddCut(
-        kLambda, "radius", [](Particle::V0 thisV0) { return (Float_t)thisV0.Radius(); }, Default::Lambda_MinRadius, Cuts::kMinimum);
-    AddCut(
-        kLambda, "dist_from_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.DistFromPV(); }, Default::Lambda_MinDistFromPV, Cuts::kMinimum);
-    AddCut(
-        kLambda, "cpa_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.CPAwrtPV(); }, Default::Lambda_MinCPAwrtPV,
-        Default::Lambda_MaxCPAwrtPV);
-    AddCut(
-        kLambda, "dca_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAwrtPV(); }, Default::Lambda_MinDCAwrtPV, Cuts::kMinimum);
-    AddCut(
-        kLambda, "dca_btw_dau", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAbtwDau(); }, Default::Lambda_MaxDCAbtwDau, Cuts::kMaximum);
-    AddCut(
-        kLambda, "dca_neg_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAnegV0(); }, Default::Lambda_MaxDCAnegV0, Cuts::kMaximum);
-    AddCut(
-        kLambda, "dca_pos_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAposV0(); }, Default::Lambda_MaxDCAposV0, Cuts::kMaximum);
-    AddCut(
-        kLambda, "arm_qt_over_alpha", [](Particle::V0 thisV0) { return (Float_t)thisV0.ArmQtOverAlpha(); }, Default::Lambda_MaxArmPtOverAlpha,
-        Cuts::kMaximum);
+    AddCut(V0::Species::Lambda, "Eta", &Particle::V0::Eta, Default::Lambda::AbsMaxEta, Limit::AbsoluteMax);
+    AddCut(V0::Species::Lambda, "Pt", &Particle::V0::Pt, Default::Lambda::MinPt, Limit::Minimum);
+    AddCut(V0::Species::Lambda, "Mass", &Particle::V0::Mass, Default::Lambda::MinMass, Default::Lambda::MaxMass);
+    AddCut(V0::Species::Lambda, "Radius", &Particle::V0::Radius, Default::Lambda::MinRadius, Limit::Minimum);
+    AddCut(V0::Species::Lambda, "DistFromPV", &Particle::V0::DistFromPV, Default::Lambda::MinDistFromPV, Limit::Minimum);
+    AddCut(V0::Species::Lambda, "CPAwrtPV", &Particle::V0::CPAwrtPV, Default::Lambda::MinCPAwrtPV, Default::Lambda::MaxCPAwrtPV);
+    AddCut(V0::Species::Lambda, "DCAwrtPV", &Particle::V0::DCAwrtPV, Default::Lambda::MinDCAwrtPV, Limit::Minimum);
+    AddCut(V0::Species::Lambda, "DCAbtwDau", &Particle::V0::DCAbtwDau, Default::Lambda::MaxDCAbtwDau, Limit::Maximum);
+    AddCut(V0::Species::Lambda, "DCAnegV0", &Particle::V0::DCAnegV0, Default::Lambda::MaxDCAnegV0, Limit::Maximum);
+    AddCut(V0::Species::Lambda, "DCAposV0", &Particle::V0::DCAposV0, Default::Lambda::MaxDCAposV0, Limit::Maximum);
+    AddCut(V0::Species::Lambda, "ArmQtOverAlpha", &Particle::V0::ArmQtOverAlpha, Default::Lambda::MaxArmQtOverAlpha, Limit::Maximum);
 }
 
 /*
@@ -43,27 +72,16 @@ void Inspector::SetLambdaDefaultCuts() {
  */
 void Inspector::SetKaonZeroDefaultCuts() {
     //
-    AddCut(
-        kKaonZero, "eta", [](Particle::V0 thisV0) { return (Float_t)thisV0.Eta(); }, Default::KaonZero_AbsMaxEta, Cuts::kAbsoluteMax);
-    AddCut(
-        kKaonZero, "pt", [](Particle::V0 thisV0) { return (Float_t)thisV0.Pt(); }, Default::KaonZero_MinPt, Cuts::kMinimum);
-    AddCut(
-        kKaonZero, "mass", [](Particle::V0 thisV0) { return (Float_t)thisV0.Mass(); }, Default::KaonZero_MinMass, Default::KaonZero_MaxMass);
-    AddCut(
-        kKaonZero, "radius", [](Particle::V0 thisV0) { return (Float_t)thisV0.Radius(); }, Default::KaonZero_MinRadius, Cuts::kMinimum);
-    AddCut(
-        kKaonZero, "dist_from_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.DistFromPV(); }, Default::KaonZero_MinDistFromPV, Cuts::kMinimum);
-    AddCut(
-        kKaonZero, "cpa_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.CPAwrtPV(); }, Default::KaonZero_MinCPAwrtPV,
-        Default::KaonZero_MaxCPAwrtPV);
-    AddCut(
-        kKaonZero, "dca_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAwrtPV(); }, Default::KaonZero_MinDCAwrtPV, Cuts::kMinimum);
-    AddCut(
-        kKaonZero, "dca_btw_dau", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAbtwDau(); }, Default::KaonZero_MaxDCAbtwDau, Cuts::kMaximum);
-    AddCut(
-        kKaonZero, "dca_neg_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAnegV0(); }, Default::KaonZero_MaxDCAnegV0, Cuts::kMaximum);
-    AddCut(
-        kKaonZero, "dca_pos_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAposV0(); }, Default::KaonZero_MaxDCAposV0, Cuts::kMaximum);
+    AddCut(V0::Species::KaonZero, "Eta", &Particle::V0::Eta, Default::KaonZero::AbsMaxEta, Limit::AbsoluteMax);
+    AddCut(V0::Species::KaonZero, "Pt", &Particle::V0::Pt, Default::KaonZero::MinPt, Limit::Minimum);
+    AddCut(V0::Species::KaonZero, "Mass", &Particle::V0::Mass, Default::KaonZero::MinMass, Default::KaonZero::MaxMass);
+    AddCut(V0::Species::KaonZero, "Radius", &Particle::V0::Radius, Default::KaonZero::MinRadius, Limit::Minimum);
+    AddCut(V0::Species::KaonZero, "DistFromPV", &Particle::V0::DistFromPV, Default::KaonZero::MinDistFromPV, Limit::Minimum);
+    AddCut(V0::Species::KaonZero, "CPAwrtPV", &Particle::V0::CPAwrtPV, Default::KaonZero::MinCPAwrtPV, Default::KaonZero::MaxCPAwrtPV);
+    AddCut(V0::Species::KaonZero, "DCAwrtPV", &Particle::V0::DCAwrtPV, Default::KaonZero::MinDCAwrtPV, Limit::Minimum);
+    AddCut(V0::Species::KaonZero, "DCAbtwDau", &Particle::V0::DCAbtwDau, Default::KaonZero::MaxDCAbtwDau, Limit::Maximum);
+    AddCut(V0::Species::KaonZero, "DCAnegV0", &Particle::V0::DCAnegV0, Default::KaonZero::MaxDCAnegV0, Limit::Maximum);
+    AddCut(V0::Species::KaonZero, "DCAposV0", &Particle::V0::DCAposV0, Default::KaonZero::MaxDCAposV0, Limit::Maximum);
 }
 
 /*
@@ -71,31 +89,32 @@ void Inspector::SetKaonZeroDefaultCuts() {
  */
 void Inspector::SetPionPairDefaultCuts() {
     //
-    AddCut(
-        kPionPair, "eta", [](Particle::V0 thisV0) { return (Float_t)thisV0.Eta(); }, Default::PionPair_AbsMaxEta, Cuts::kAbsoluteMax);
-    AddCut(
-        kPionPair, "pt", [](Particle::V0 thisV0) { return (Float_t)thisV0.Pt(); }, Default::PionPair_MinPt, Cuts::kMinimum);
-    AddCut(
-        kPionPair, "radius", [](Particle::V0 thisV0) { return (Float_t)thisV0.Radius(); }, Default::PionPair_MinRadius, Cuts::kMinimum);
-    AddCut(
-        kPionPair, "cpa_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.CPAwrtPV(); }, Default::PionPair_MinCPAwrtPV,
-        Default::PionPair_MaxCPAwrtPV);
-    AddCut(
-        kPionPair, "dca_wrt_pv", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAwrtPV(); }, Default::PionPair_MinDCAwrtPV, Cuts::kMinimum);
-    AddCut(
-        kPionPair, "dca_btw_dau", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAbtwDau(); }, Default::PionPair_MaxDCAbtwDau, Cuts::kMaximum);
-    AddCut(
-        kPionPair, "dca_neg_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAnegV0(); }, Default::PionPair_MaxDCAnegV0, Cuts::kMaximum);
-    AddCut(
-        kPionPair, "dca_pos_v0", [](Particle::V0 thisV0) { return (Float_t)thisV0.DCAposV0(); }, Default::PionPair_MaxDCAposV0, Cuts::kMaximum);
+    AddCut(V0::Species::PionPair, "Eta", &Particle::V0::Eta, Default::PionPair::AbsMaxEta, Limit::AbsoluteMax);
+    AddCut(V0::Species::PionPair, "Pt", &Particle::V0::Pt, Default::PionPair::MinPt, Limit::Minimum);
+    AddCut(V0::Species::PionPair, "Radius", &Particle::V0::Radius, Default::PionPair::MinRadius, Limit::Minimum);
+    AddCut(V0::Species::PionPair, "CPAwrtPV", &Particle::V0::CPAwrtPV, Default::PionPair::MinCPAwrtPV, Default::PionPair::MaxCPAwrtPV);
+    AddCut(V0::Species::PionPair, "DCAwrtPV", &Particle::V0::DCAwrtPV, Default::PionPair::MinDCAwrtPV, Limit::Minimum);
+    AddCut(V0::Species::PionPair, "DCAbtwDau", &Particle::V0::DCAbtwDau, Default::PionPair::MaxDCAbtwDau, Limit::Maximum);
+    AddCut(V0::Species::PionPair, "DCAnegV0", &Particle::V0::DCAnegV0, Default::PionPair::MaxDCAnegV0, Limit::Maximum);
+    AddCut(V0::Species::PionPair, "DCAposV0", &Particle::V0::DCAposV0, Default::PionPair::MaxDCAposV0, Limit::Maximum);
 }
 
 /*
  *
  */
-
 void Inspector::SetSexaquarkDefaultCuts_ChannelA() {
     //
+    /* -- Common */
+    AddCut("Radius", &Sexaquark::ChannelA::Radius, Default::ChannelA::MinRadius, Limit::Minimum);
+    AddCut("Rapidity", &Sexaquark::ChannelA::Rapidity, Default::ChannelA::MaxRapidity, Limit::Maximum);
+    AddCut("CPAwrtPV", &Sexaquark::ChannelA::CPAwrtPV, Default::ChannelA::MinCPAwrtPV, Default::ChannelA::MaxCPAwrtPV);
+    AddCut("DCALaSV", &Sexaquark::ChannelA::DCALaSV, Default::ChannelA::MaxDCALaSV, Limit::Maximum);
+    AddCut("DCALaNegSV", &Sexaquark::ChannelA::DCALaNegSV, Default::ChannelA::MaxDCALaNegSV, Limit::Maximum);
+    AddCut("DCALaPosSV", &Sexaquark::ChannelA::DCALaPosSV, Default::ChannelA::MaxDCALaPosSV, Limit::Maximum);
+    AddCut("DCAK0SV", &Sexaquark::ChannelA::DCAK0SV, Default::ChannelA::MaxDCAK0SV, Limit::Maximum);
+    AddCut("DCAK0NegSV", &Sexaquark::ChannelA::DCAK0NegSV, Default::ChannelA::MaxDCAK0NegSV, Limit::Maximum);
+    AddCut("DCAK0PosSV", &Sexaquark::ChannelA::DCAK0PosSV, Default::ChannelA::MaxDCAK0PosSV, Limit::Maximum);
+    AddCut("DCAbtwV0s", &Sexaquark::ChannelA::DCAbtwV0s, Default::ChannelA::MaxDCAbtwV0s, Limit::Maximum);
 }
 
 /*
@@ -103,6 +122,14 @@ void Inspector::SetSexaquarkDefaultCuts_ChannelA() {
  */
 void Inspector::SetSexaquarkDefaultCuts_ChannelD() {
     //
+    AddCut("Radius", &Sexaquark::ChannelD::Radius, Default::ChannelD::MinRadius, Limit::Minimum);
+    AddCut("Rapidity", &Sexaquark::ChannelD::Rapidity, Default::ChannelD::MaxRapidity, Limit::Maximum);
+    AddCut("CPAwrtPV", &Sexaquark::ChannelD::CPAwrtPV, Default::ChannelD::MinCPAwrtPV, Default::ChannelD::MaxCPAwrtPV);
+    AddCut("DCALaSV", &Sexaquark::ChannelD::DCALaSV, Default::ChannelD::MaxDCALaSV, Limit::Maximum);
+    AddCut("DCALaNegSV", &Sexaquark::ChannelD::DCALaNegSV, Default::ChannelD::MaxDCALaNegSV, Limit::Maximum);
+    AddCut("DCALaPosSV", &Sexaquark::ChannelD::DCALaPosSV, Default::ChannelD::MaxDCALaPosSV, Limit::Maximum);
+    AddCut("DCAKaSV", &Sexaquark::ChannelD::DCAKaSV, Default::ChannelD::MaxDCAKaSV, Limit::Maximum);
+    AddCut("DCAKaLa", &Sexaquark::ChannelD::DCAKaLa, Default::ChannelD::MaxDCAKaLa, Limit::Maximum);
 }
 
 /*
@@ -110,6 +137,17 @@ void Inspector::SetSexaquarkDefaultCuts_ChannelD() {
  */
 void Inspector::SetSexaquarkDefaultCuts_ChannelE() {
     //
+    AddCut("Radius", &Sexaquark::ChannelE::Radius, Default::ChannelE::MinRadius, Limit::Minimum);
+    AddCut("Rapidity", &Sexaquark::ChannelE::Rapidity, Default::ChannelE::MaxRapidity, Limit::Maximum);
+    AddCut("CPAwrtPV", &Sexaquark::ChannelE::CPAwrtPV, Default::ChannelE::MinCPAwrtPV, Default::ChannelE::MaxCPAwrtPV);
+    AddCut("DCAKaSV", &Sexaquark::ChannelE::DCAKaSV, Default::ChannelE::MaxDCAKaSV, Limit::Maximum);
+    AddCut("DCAKaLa", &Sexaquark::ChannelE::DCAKaLa, Default::ChannelE::MaxDCAKaLa, Limit::Maximum);
+    AddCut("DCApmSV", &Sexaquark::ChannelE::DCApmSV, Default::ChannelE::MaxDCApmSV, Limit::Maximum);
+    AddCut("DCAppSV", &Sexaquark::ChannelE::DCAppSV, Default::ChannelE::MaxDCAppSV, Limit::Maximum);
+    AddCut("DCApmLa", &Sexaquark::ChannelE::DCApmLa, Default::ChannelE::MaxDCApmLa, Limit::Maximum);
+    AddCut("DCAppLa", &Sexaquark::ChannelE::DCAppLa, Default::ChannelE::MaxDCAppLa, Limit::Maximum);
+    AddCut("DCApmKa", &Sexaquark::ChannelE::DCApmKa, Default::ChannelE::MaxDCApmKa, Limit::Maximum);
+    AddCut("DCAppKa", &Sexaquark::ChannelE::DCAppKa, Default::ChannelE::MaxDCAppKa, Limit::Maximum);
 }
 
 /*
@@ -117,43 +155,12 @@ void Inspector::SetSexaquarkDefaultCuts_ChannelE() {
  */
 void Inspector::SetKaonPairDefaultCuts() {
     //
-}
-
-/*
- *
- */
-Bool_t Inspector::Approve(Particle::V0& thisV0) {
-    //
-    std::vector<Cut<Particle::V0>> CutsCollection;
-    /*  */
-    if (TMath::Abs(thisV0.PdgCode) == 3122) CutsCollection = fCuts_Lambda;
-    if (TMath::Abs(thisV0.PdgCode) == 310) CutsCollection = fCuts_KaonZero;
-    if (TMath::Abs(thisV0.PdgCode) == 422) CutsCollection = fCuts_PionPair;
-    /*  */
-    for (Cut<Particle::V0>& cut : CutsCollection) {
-        if (!cut.Check(thisV0)) return kFALSE;
-    }
-    InfoF("Particle approved. Glory to Arstotzka. %s", "");
-    return kTRUE;
-}
-
-/*
- *
- */
-Bool_t Inspector::Approve(Particle::Sexaquark& candidate) {
-    //
-    std::vector<Cut<Particle::Sexaquark>> CutsCollection;
-    /*  */
-    if (TMath::Abs(candidate.Channel) == kChannelA) CutsCollection = fCuts_ChannelA;
-    if (TMath::Abs(candidate.Channel) == kChannelD) CutsCollection = fCuts_ChannelD;
-    if (TMath::Abs(candidate.Channel) == kChannelE) CutsCollection = fCuts_ChannelE;
-    if (TMath::Abs(candidate.Channel) == kChannelH) CutsCollection = fCuts_KaonPair;
-    /*  */
-    for (Cut<Particle::Sexaquark>& cut : CutsCollection) {
-        if (!cut.Check(candidate)) return kFALSE;
-    }
-    InfoF("Particle approved. Glory to Arstotzka. %s", "");
-    return kTRUE;
+    AddCut("Radius", &Sexaquark::KaonPair::Radius, Default::KaonPair::MinRadius, Limit::Minimum);
+    AddCut("Rapidity", &Sexaquark::KaonPair::Rapidity, Default::KaonPair::MaxRapidity, Limit::Maximum);
+    AddCut("CPAwrtPV", &Sexaquark::KaonPair::CPAwrtPV, Default::KaonPair::MinCPAwrtPV, Default::KaonPair::MaxCPAwrtPV);
+    AddCut("DCAbtwKK", &Sexaquark::KaonPair::DCAbtwKK, Default::KaonPair::MaxDCAbtwKK, Limit::Maximum);
+    AddCut("DCAkaSV", &Sexaquark::KaonPair::DCAkaSV, Default::KaonPair::MaxDCAkaSV, Limit::Maximum);
+    AddCut("DCAkbSV", &Sexaquark::KaonPair::DCAkbSV, Default::KaonPair::MaxDCAkbSV, Limit::Maximum);
 }
 
 /*
@@ -162,19 +169,19 @@ Bool_t Inspector::Approve(Particle::Sexaquark& candidate) {
 void Inspector::PrintAllCuts() {
     //
     InfoF("Lambda cuts: %s", "");
-    for (Cut<Particle::V0>& cut : fCuts_Lambda) cut.Print();
+    for (auto cut : fCuts_Lambda) cut.Print();
     InfoF("KaonZero cuts: %s", "");
-    for (Cut<Particle::V0>& cut : fCuts_KaonZero) cut.Print();
+    for (auto cut : fCuts_KaonZero) cut.Print();
     InfoF("PionPair cuts: %s", "");
-    for (Cut<Particle::V0>& cut : fCuts_PionPair) cut.Print();
+    for (auto cut : fCuts_PionPair) cut.Print();
     InfoF("ChannelA cuts: %s", "");
-    for (Cut<Particle::Sexaquark>& cut : fCuts_ChannelA) cut.Print();
+    for (auto cut : fCuts_ChannelA) cut.Print();
     InfoF("ChannelD cuts: %s", "");
-    for (Cut<Particle::Sexaquark>& cut : fCuts_ChannelD) cut.Print();
+    for (auto cut : fCuts_ChannelD) cut.Print();
     InfoF("ChannelE cuts: %s", "");
-    for (Cut<Particle::Sexaquark>& cut : fCuts_ChannelE) cut.Print();
+    for (auto cut : fCuts_ChannelE) cut.Print();
     InfoF("KaonPair cuts: %s", "");
-    for (Cut<Particle::Sexaquark>& cut : fCuts_KaonPair) cut.Print();
+    for (auto cut : fCuts_KaonPair) cut.Print();
 }
 
 }  // namespace Cuts

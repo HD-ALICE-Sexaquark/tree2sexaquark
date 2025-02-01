@@ -3,8 +3,6 @@
 
 #include "Math/Vector4D.h"
 
-#include "Utilities/Constants.hxx"
-
 #include "Particles/Base.hxx"
 
 namespace Tree2Sexaquark {
@@ -15,15 +13,17 @@ namespace Particle {
  */
 class Sexaquark : public Base {
    public:
-    inline Double_t LambdaPx() { return lvLambda.Px(); }
-    inline Double_t LambdaPy() { return lvLambda.Py(); }
-    inline Double_t LambdaPz() { return lvLambda.Pz(); }
-    void Test();
+    inline Double_t DCALaSV() { return TMath::Abs((Double_t)kfLambda.GetDistanceFromVertex(kfThis)); };
+    inline Double_t DCALaNegSV() { return TMath::Abs((Double_t)kfLambdaNeg.GetDistanceFromVertex(kfThis)); };
+    inline Double_t DCALaPosSV() { return TMath::Abs((Double_t)kfLambdaPos.GetDistanceFromVertex(kfThis)); };
 
-    Channel_t Channel;
+   protected:
+    KFParticle kfLambda;
 
    private:
     ROOT::Math::PxPyPzEVector lvLambda;
+    KFParticle kfLambdaNeg;
+    KFParticle kfLambdaPos;
 };
 
 }  // namespace Particle

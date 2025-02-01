@@ -7,8 +7,6 @@ target_link_libraries(App
     Reader
     Writer
     Inspector
-    V0
-    Sexaquark
     Parser
     Settings
     Common
