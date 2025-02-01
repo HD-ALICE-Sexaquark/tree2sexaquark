@@ -10,6 +10,18 @@
 namespace Tree2Sexaquark {
 namespace Default {
 
+namespace Proton {
+const Double_t MaxNSigma = 3.;
+}  // namespace Proton
+
+namespace Kaon {
+const Double_t MaxNSigma = 3.;
+}  // namespace Kaon
+
+namespace Pion {
+const Double_t MaxNSigma = 3.;
+}  // namespace Pion
+
 namespace Lambda {
 const Double_t AbsMaxEta = 0.9;
 const Double_t MinPt = 1.0;

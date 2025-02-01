@@ -102,6 +102,8 @@ class Cut {
         fMaxDefined = kTRUE;
     }
 
+    Double_t Evaluate(Particle particle) { return std::invoke(fExpression, particle); }
+
     Bool_t Check(Particle particle) const {
         //
         if (!fExpression) {
@@ -117,12 +119,6 @@ class Cut {
         Bool_t result = kTRUE;
         if (fMinDefined) result = result && eval > fMinimum;
         if (fMaxDefined) result = result && eval < fMaximum;
-        /*  */
-        DebugF("eval=%f, %s %s, %s %s, result=%i",                                 //
-               eval,                                                               //
-               (fMinDefined ? ">" : ""), fMinDefined ? Form("%f", fMinimum) : "",  //
-               (fMaxDefined ? "<" : ""), fMaxDefined ? Form("%f", fMaximum) : "",  //
-               result);
         return result;
     }
 

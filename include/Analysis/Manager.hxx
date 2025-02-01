@@ -20,6 +20,7 @@
 
 #include "Analysis/Settings.hxx"
 #include "Cuts/Inspector.hxx"
+#include "Particles/V0.hxx"
 #include "Trees/Reader.hxx"
 #include "Trees/Writer.hxx"
 
@@ -47,7 +48,7 @@ class Manager : public Reader, public Writer {
             ErrorF("TTree %s couldn't be found in TFile %s", tree_name.Data(), InputFile->GetName());
             return nullptr;
         }
-        DebugF("TTree %s found in TFile %s", tree_name.Data(), InputFile->GetName());
+        InfoF("TTree %s found in TFile %s", tree_name.Data(), InputFile->GetName());
         return AuxTree;
     }
 
@@ -57,7 +58,7 @@ class Manager : public Reader, public Writer {
             ErrorF("TTree %s couldn't be found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
             return nullptr;
         }
-        DebugF("TTree %s found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
+        InfoF("TTree %s found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
         return AuxTree;
     }
 
@@ -66,13 +67,54 @@ class Manager : public Reader, public Writer {
 
     /* MC Particles */
     void ProcessMCParticles();
+    inline Bool_t MC_IsFinalStateSignal() { return MC.Generator == 2 && MC.Idx_Ancestor != -1; }
+    inline Bool_t MC_IsSignal() { return MC.Generator == 2; }
+    inline Bool_t MC_IsSecondary() { return MC.IsSecFromMat || MC.IsSecFromWeak || MC_IsSignal(); }
+    /* -- translate between MC entries and indices */
+    inline Long64_t GetMcEntry(UInt_t mcIdx) { return getMcEntry_fromMcIdx[mcIdx]; }
+    inline UInt_t GetMcIdx(Long64_t mcEntry) { return getMcIdx_FromMcEntry[mcEntry]; }
+    /* -- necessary for V0s */
+    inline Long64_t GetMcEntryNeg(Long64_t mcEntryMother) {
+        UInt_t mcIdxMother = GetMcIdx(mcEntryMother);
+        if (getMcIdxNeg_fromMcIdx.find(mcIdxMother) == getMcIdxNeg_fromMcIdx.end()) return -1;
+        UInt_t mcIdxNeg = getMcIdxNeg_fromMcIdx[mcIdxMother];
+        return GetMcEntry(mcIdxNeg);
+    }
+    inline Long64_t GetMcEntryPos(Long64_t mcEntryMother) {
+        UInt_t mcIdxMother = GetMcIdx(mcEntryMother);
+        if (getMcIdxPos_fromMcIdx.find(mcIdxMother) == getMcIdxPos_fromMcIdx.end()) return -1;
+        UInt_t mcIdxPos = getMcIdxPos_fromMcIdx[mcIdxMother];
+        return GetMcEntry(mcIdxPos);
+    }
 
     /* Tracks */
     void ProcessTracks();
+    /* -- translate between Track entries and ESD indices */
+    inline Long64_t GetTrackEntry(UInt_t esdIdx) { return getTrackEntry_fromEsdIdx[esdIdx]; }
+    inline UInt_t GetEsdIdx(Long64_t trackEntry) { return getEsdIdx_fromTrackEntry[trackEntry]; }
+    /* -- link between MC and Tracks */
+    inline Long64_t GetTrackEntryFromMcEntry(Long64_t mcEntry) {
+        UInt_t mcIdx = GetMcIdx(mcEntry);
+        if (getEsdIdx_fromMcIdx.find(mcIdx) == getEsdIdx_fromMcIdx.end()) return -1;
+        return GetTrackEntry(getEsdIdx_fromMcIdx[mcIdx]);
+    }
+    inline Long64_t GetMcEntryFromTrackEntry(Long64_t trackEntry) {
+        UInt_t esdIdx = GetEsdIdx(trackEntry);
+        if (getMcIdx_fromEsdIdx.find(esdIdx) == getMcIdx_fromEsdIdx.end()) return -1;
+        return GetMcEntry(getMcIdx_fromEsdIdx[esdIdx]);
+    }
+    /*  */
+    inline Bool_t CopyTrack(Long64_t trackEntry, Track_tt& track) {
+        if (!ReadTrack(trackEntry)) return kFALSE;
+        track = Track;
+        return kTRUE;
+    }
 
     /* V0s */
     void ProcessFindableV0s();
-    void KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0 = -1);
+    void KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0);
+    void CollectTrueV0(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos, Bool_t& isTrue, Int_t& mcIdxV0, Int_t& mcPdgCode, Bool_t& isSecondary,
+                       Bool_t& isSignal, Int_t& reactionID, Bool_t& isHybrid);
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
@@ -83,89 +125,6 @@ class Manager : public Reader, public Writer {
 
     /* Cuts */
     Cuts::Inspector Inspector;
-
-    /* Related to Containers */
-    /* -- filled at `ProcessMCParticles()` */
-    inline Bool_t GetMcEntry(UInt_t mcIdx, Long64_t& mcEntry) {
-        if (getMcEntry_fromMcIdx.find(mcIdx) == getMcEntry_fromMcIdx.end()) return kFALSE;
-        mcEntry = getMcEntry_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetPdgCode(UInt_t mcIdx, Int_t& pdgCode) {
-        if (getPdgCode_fromMcIdx.find(mcIdx) == getPdgCode_fromMcIdx.end()) return kFALSE;
-        pdgCode = getPdgCode_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t IsSignal(UInt_t mcIdx) {
-        if (isMcIdxSignal.find(mcIdx) == isMcIdxSignal.end()) return kFALSE;
-        return isMcIdxSignal[mcIdx];
-    }
-    inline Bool_t IsSecondary(UInt_t mcIdx) {
-        if (isMcIdxSecondary.find(mcIdx) == isMcIdxSecondary.end()) return kFALSE;
-        return isMcIdxSecondary[mcIdx];
-    }
-    inline Bool_t GetReactionID(UInt_t mcIdx, UInt_t& reactionID) {
-        if (getReactionID_fromMcIdx.find(mcIdx) == getReactionID_fromMcIdx.end()) return kFALSE;
-        if (getReactionID_fromMcIdx[mcIdx] == -1) return kFALSE;
-        reactionID = getReactionID_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetMcIndices(UInt_t reactionID, std::vector<UInt_t>& mcIndices) {
-        if (getMcIndices_fromReactionID.find(reactionID) == getMcIndices_fromReactionID.end()) return kFALSE;
-        mcIndices = getMcIndices_fromReactionID[reactionID];
-        return kTRUE;
-    }
-    inline Bool_t GetMotherMcIdx(UInt_t mcIdx, UInt_t& mcIdxMother) {
-        if (getMotherMcIdx_fromMcIdx.find(mcIdx) == getMotherMcIdx_fromMcIdx.end()) return kFALSE;
-        if (getMotherMcIdx_fromMcIdx[mcIdx] == -1) return kFALSE;
-        mcIdxMother = getMotherMcIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetAncestorMcIdx(UInt_t mcIdx, UInt_t& ancestorMcIdx) {
-        if (getAncestorMcIdx_fromMcIdx.find(mcIdx) == getAncestorMcIdx_fromMcIdx.end()) return kFALSE;
-        if (getAncestorMcIdx_fromMcIdx[mcIdx] == -1) return kFALSE;
-        ancestorMcIdx = getAncestorMcIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetNegDauMcIdx(UInt_t mcIdx, UInt_t& negDauMcIdx) {
-        if (getNegDauMcIdx_fromMcIdx.find(mcIdx) == getNegDauMcIdx_fromMcIdx.end()) return kFALSE;
-        negDauMcIdx = getNegDauMcIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetPosDauMcIdx(UInt_t mcIdx, UInt_t& posDauMcIdx) {
-        if (getPosDauMcIdx_fromMcIdx.find(mcIdx) == getPosDauMcIdx_fromMcIdx.end()) return kFALSE;
-        posDauMcIdx = getPosDauMcIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    /* -- filled at `ProcessTracks()` */
-    inline Bool_t GetTrackEntry(UInt_t esdIdx, Long64_t& trackEntry) {
-        if (getTrackEntry_fromEsdIdx.find(esdIdx) == getTrackEntry_fromEsdIdx.end()) return kFALSE;
-        trackEntry = getTrackEntry_fromEsdIdx[esdIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetMcIdx(UInt_t esdIdx, UInt_t& mcIdx) {
-        if (getMcIdx_fromEsdIdx.find(esdIdx) == getMcIdx_fromEsdIdx.end()) return kFALSE;
-        mcIdx = getMcIdx_fromEsdIdx[esdIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetTrack(UInt_t esdIdx, Track_tt& track) {
-        Long64_t trackEntry;
-        if (!GetTrackEntry(esdIdx, trackEntry)) return kFALSE;
-        if (!ReadTrack(trackEntry)) return kFALSE;
-        track = Track;
-        return kTRUE;
-    }
-    /* -- used in `ProcessFindableV0s()` */
-    inline Bool_t GetNegDauEsdIdx(UInt_t mcIdx, UInt_t& negDauEsdIdx) {
-        if (getNegDauEsdIdx_fromMcIdx.find(mcIdx) == getNegDauEsdIdx_fromMcIdx.end()) return kFALSE;
-        negDauEsdIdx = getNegDauEsdIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
-    inline Bool_t GetPosDauEsdIdx(UInt_t mcIdx, UInt_t& posDauEsdIdx) {
-        if (getPosDauEsdIdx_fromMcIdx.find(mcIdx) == getPosDauEsdIdx_fromMcIdx.end()) return kFALSE;
-        posDauEsdIdx = getPosDauEsdIdx_fromMcIdx[mcIdx];
-        return kTRUE;
-    }
 
     /* Utilities */
     void CleanContainers();
@@ -185,33 +144,33 @@ class Manager : public Reader, public Writer {
     TDatabasePDG fPDG;
 
     /* Containers */
-    /* -- filled at `ProcessMCParticles()` */
-    std::unordered_map<UInt_t, Long64_t> getMcEntry_fromMcIdx;                    // key: `mcIdx`, value: get MC position within the tree
-    std::unordered_map<UInt_t, Int_t> getPdgCode_fromMcIdx;                       // key: `mcIdx`
-    std::unordered_map<UInt_t, Bool_t> isMcIdxSignal;                             // key: `mcIdx`
-    std::unordered_map<UInt_t, Bool_t> isMcIdxSecondary;                          // key: `mcIdx`
-    std::unordered_map<UInt_t, Int_t> getReactionID_fromMcIdx;                    // key: `mcIdx`
-    std::unordered_map<UInt_t, std::vector<UInt_t>> getMcIndices_fromReactionID;  // key: `ReactionID`
-    std::unordered_map<UInt_t, Int_t> getMotherMcIdx_fromMcIdx;                   // key: `mcIdx`
-    std::unordered_map<UInt_t, Int_t> getAncestorMcIdx_fromMcIdx;                 // key: `mcIdx`
-    std::unordered_map<UInt_t, UInt_t> getNegDauMcIdx_fromMcIdx;                  // key: `mcIdx`
-    std::unordered_map<UInt_t, UInt_t> getPosDauMcIdx_fromMcIdx;                  // key: `mcIdx`
-    /* -- filled at `ProcessTracks()` */
-    std::unordered_map<UInt_t, Long64_t> getTrackEntry_fromEsdIdx;  // key: `esdIdx`, value: get track position within the tree
-    std::unordered_map<UInt_t, UInt_t> getMcIdx_fromEsdIdx;         // key: `esdIdx`
-    /* -- and looped over in `KalmanV0Finder()` and Sexaquark Finders */
-    std::vector<UInt_t> esdIndicesOfAntiProtonTracks;
-    std::vector<UInt_t> esdIndicesOfProtonTracks;
-    std::vector<UInt_t> esdIndicesOfNegKaonTracks;
-    std::vector<UInt_t> esdIndicesOfPosKaonTracks;
-    std::vector<UInt_t> esdIndicesOfPiMinusTracks;
-    std::vector<UInt_t> esdIndicesOfPiPlusTracks;
-    /* -- used in `ProcessFindableV0s()` */
-    std::vector<UInt_t> mcIndicesOfTrueV0s;
-    std::unordered_map<UInt_t, UInt_t> getNegDauEsdIdx_fromMcIdx;  // key: `mcIdx`
-    std::unordered_map<UInt_t, UInt_t> getPosDauEsdIdx_fromMcIdx;  // key: `mcIdx`
-    /* -- used in `ProcessFindableSexaquarks()` */
-    std::unordered_map<UInt_t, std::vector<UInt_t>> getEsdIndices_fromReactionID;  // key: `ReactionID`
+    /* -- filled in `ProcessMCParticles()` */
+    std::unordered_map<Long64_t, UInt_t> getMcIdx_FromMcEntry;
+    std::unordered_map<UInt_t, Long64_t> getMcEntry_fromMcIdx;
+    /*** -- and looped over in `ProcessFindableV0s()` */
+    std::vector<Long64_t> mcEntriesOfTrueV0s;
+    std::unordered_map<UInt_t, UInt_t> getMcIdxNeg_fromMcIdx;
+    std::unordered_map<UInt_t, UInt_t> getMcIdxPos_fromMcIdx;
+    /*** -- and looped over in `ProcessFindableSexaquarks()` */
+    std::map<UInt_t, std::vector<Long64_t>> getMcEntries_fromReactionID;  // NOTE: final state particles
+    /* -- filled in `ProcessTracks()` */
+    std::unordered_map<UInt_t, Long64_t> getTrackEntry_fromEsdIdx;
+    std::unordered_map<Long64_t, UInt_t> getEsdIdx_fromTrackEntry;
+    /*** -- and looped over in `ProcessFindableV0s()` */
+    std::unordered_map<UInt_t, UInt_t> getMcIdx_fromEsdIdx;
+    std::unordered_map<UInt_t, UInt_t> getEsdIdx_fromMcIdx;
+    /*** -- and looped over in `KalmanV0Finder()` and `KalmanSexaquarkFinder()` */
+    std::vector<Long64_t> TrackEntries_AntiProton;
+    std::vector<Long64_t> TrackEntries_Proton;
+    std::vector<Long64_t> TrackEntries_NegKaon;
+    std::vector<Long64_t> TrackEntries_PosKaon;
+    std::vector<Long64_t> TrackEntries_PiMinus;
+    std::vector<Long64_t> TrackEntries_PiPlus;
+    /* -- filled in `KalmanV0Finder()` and looped over in `KalmanSexaquarkFinder()` */
+    std::vector<Particle::V0> AntiLambdas;
+    std::vector<Particle::V0> Lambdas;
+    std::vector<Particle::V0> KaonsZeroShort;
+    std::vector<Particle::V0> PionPairs;
 };
 
 }  // namespace Analysis

@@ -72,16 +72,16 @@ void Inspector::SetLambdaDefaultCuts() {
  */
 void Inspector::SetKaonZeroDefaultCuts() {
     //
-    AddCut(V0::Species::KaonZero, "Eta", &Particle::V0::Eta, Default::KaonZero::AbsMaxEta, Limit::AbsoluteMax);
-    AddCut(V0::Species::KaonZero, "Pt", &Particle::V0::Pt, Default::KaonZero::MinPt, Limit::Minimum);
-    AddCut(V0::Species::KaonZero, "Mass", &Particle::V0::Mass, Default::KaonZero::MinMass, Default::KaonZero::MaxMass);
-    AddCut(V0::Species::KaonZero, "Radius", &Particle::V0::Radius, Default::KaonZero::MinRadius, Limit::Minimum);
-    AddCut(V0::Species::KaonZero, "DistFromPV", &Particle::V0::DistFromPV, Default::KaonZero::MinDistFromPV, Limit::Minimum);
-    AddCut(V0::Species::KaonZero, "CPAwrtPV", &Particle::V0::CPAwrtPV, Default::KaonZero::MinCPAwrtPV, Default::KaonZero::MaxCPAwrtPV);
-    AddCut(V0::Species::KaonZero, "DCAwrtPV", &Particle::V0::DCAwrtPV, Default::KaonZero::MinDCAwrtPV, Limit::Minimum);
-    AddCut(V0::Species::KaonZero, "DCAbtwDau", &Particle::V0::DCAbtwDau, Default::KaonZero::MaxDCAbtwDau, Limit::Maximum);
-    AddCut(V0::Species::KaonZero, "DCAnegV0", &Particle::V0::DCAnegV0, Default::KaonZero::MaxDCAnegV0, Limit::Maximum);
-    AddCut(V0::Species::KaonZero, "DCAposV0", &Particle::V0::DCAposV0, Default::KaonZero::MaxDCAposV0, Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "Eta", &Particle::V0::Eta, Default::KaonZero::AbsMaxEta, Limit::AbsoluteMax);
+    AddCut(V0::Species::KaonZeroShort, "Pt", &Particle::V0::Pt, Default::KaonZero::MinPt, Limit::Minimum);
+    AddCut(V0::Species::KaonZeroShort, "Mass", &Particle::V0::Mass, Default::KaonZero::MinMass, Default::KaonZero::MaxMass);
+    AddCut(V0::Species::KaonZeroShort, "Radius", &Particle::V0::Radius, Default::KaonZero::MinRadius, Limit::Minimum);
+    AddCut(V0::Species::KaonZeroShort, "DistFromPV", &Particle::V0::DistFromPV, Default::KaonZero::MinDistFromPV, Limit::Minimum);
+    AddCut(V0::Species::KaonZeroShort, "CPAwrtPV", &Particle::V0::CPAwrtPV, Default::KaonZero::MinCPAwrtPV, Default::KaonZero::MaxCPAwrtPV);
+    AddCut(V0::Species::KaonZeroShort, "DCAwrtPV", &Particle::V0::DCAwrtPV, Default::KaonZero::MinDCAwrtPV, Limit::Minimum);
+    AddCut(V0::Species::KaonZeroShort, "DCAbtwDau", &Particle::V0::DCAbtwDau, Default::KaonZero::MaxDCAbtwDau, Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "DCAnegV0", &Particle::V0::DCAnegV0, Default::KaonZero::MaxDCAnegV0, Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "DCAposV0", &Particle::V0::DCAposV0, Default::KaonZero::MaxDCAposV0, Limit::Maximum);
 }
 
 /*

@@ -6,8 +6,8 @@
 
 #include "KFParticle.h"
 
+#include "Cuts/Default.hxx"
 #include "Math/KalmanFilter.hxx"
-#include "Particles/V0.hxx"
 
 namespace Tree2Sexaquark {
 namespace Analysis {
@@ -73,7 +73,7 @@ Bool_t Manager::GetEvent(Long64_t evt_idx) {
     }
     if (Settings::IsMC) {
         if (Settings::IsSignalMC)
-            Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
+            Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);  // PENDING
         else
             Event_UID = TString::Format("MC_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
     } else {
@@ -113,8 +113,8 @@ void Manager::ProcessInjected() {
 
     for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
         if (!ReadInjected(sexa_entry)) continue;
-        // DebugF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
-    }
+        InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
+    }  // end of loop over injected reactions
 }
 
 /*
@@ -122,37 +122,33 @@ void Manager::ProcessInjected() {
  */
 void Manager::ProcessMCParticles() {
     //
-    TTree* MCTree = FindTreeInEventDir("MC");
-    if (!MCTree) return;
+    TTree* InputTree_MC = FindTreeInEventDir("MC");
+    if (!InputTree_MC) return;
 
-    SetMCTree(MCTree);
+    SetMCTree(InputTree_MC);
     ConnectMCBranches();
 
-    for (Long64_t mc_entry = 0; mc_entry < GetN_MCParticles(); mc_entry++) {
-        if (!ReadMCParticle(mc_entry)) continue;
+    fTree_MC->SetBranchStatus("*", 0);
+    fTree_MC->SetBranchStatus("Idx", 1);
+    fTree_MC->SetBranchStatus("PdgCode", 1);
+    fTree_MC->SetBranchStatus("Idx_Mother", 1);
+    fTree_MC->SetBranchStatus("Idx_Ancestor", 1);
+    fTree_MC->SetBranchStatus("Generator", 1);
+    fTree_MC->SetBranchStatus("ReactionID", 1);
+
+    for (Long64_t MC_Entry = 0; MC_Entry < GetN_MCParticles(); MC_Entry++) {
+        if (!ReadMCParticle(MC_Entry)) continue;
         /* Fill containers */
-        getMcEntry_fromMcIdx[MC.Idx] = mc_entry;
-        getPdgCode_fromMcIdx[MC.Idx] = MC.PdgCode;
-        isMcIdxSignal[MC.Idx] = MC.Generator == 2 && MC.Idx_Ancestor == -1;
-        isMcIdxSecondary[MC.Idx] = MC.IsSecFromMat || MC.IsSecFromWeak || isMcIdxSignal[MC.Idx];
-        if (isMcIdxSignal[MC.Idx]) {
-            getReactionID_fromMcIdx[MC.Idx] = MC.ReactionID;
-            getMcIndices_fromReactionID[MC.ReactionID].push_back(MC.Idx);
-        } else {
-            getReactionID_fromMcIdx[MC.Idx] = -1;
-        }
-        getMotherMcIdx_fromMcIdx[MC.Idx] = MC.Idx_Mother;
-        getAncestorMcIdx_fromMcIdx[MC.Idx] = MC.Idx_Ancestor;
+        getMcIdx_FromMcEntry[MC_Entry] = MC.Idx;
+        getMcEntry_fromMcIdx[MC.Idx] = MC_Entry;
+        if (MC.PdgCode == 310 || TMath::Abs(MC.PdgCode) == 3122) mcEntriesOfTrueV0s.push_back(MC_Entry);
         if (MC.Idx_Mother >= 0) {
-            if (MC.PdgCode == -211 || MC.PdgCode == -2212) getNegDauMcIdx_fromMcIdx[MC.Idx_Mother] = MC.Idx;
-            if (MC.PdgCode == 211 || MC.PdgCode == 2212) getPosDauMcIdx_fromMcIdx[MC.Idx_Mother] = MC.Idx;
+            if (MC.PdgCode == -211 || MC.PdgCode == -2212) getMcIdxNeg_fromMcIdx[MC.Idx_Mother] = MC.Idx;
+            if (MC.PdgCode == 211 || MC.PdgCode == 2212) getMcIdxPos_fromMcIdx[MC.Idx_Mother] = MC.Idx;
         }
-        if (MC.PdgCode == 310 || TMath::Abs(MC.PdgCode) == 3122) mcIndicesOfTrueV0s.push_back(MC.Idx);
-        /*  */
-        // if (isMcIdxSignal[MC.Idx]) continue;
-        // InfoF("entry=%lld, mcIdx=%u, pdg=%i, primary=%i, secfrommat=%i, secfromweak=%i, mother=%i, ancestor=%i",  //
-        //   mc_entry, MC.Idx, MC.PdgCode, MC.IsPrimary, MC.IsSecFromMat, MC.IsSecFromWeak, MC.Idx_Mother, MC.Idx_Ancestor);
-    }
+        if (MC_IsFinalStateSignal()) getMcEntries_fromReactionID[(UInt_t)MC.ReactionID].push_back(MC_Entry);
+    }  // end of loop over MC particles
+    InfoF("N Found True V0s: %lu", mcEntriesOfTrueV0s.size());
 }
 
 /*
@@ -166,36 +162,49 @@ void Manager::ProcessTracks() {
     SetTracksTree(TracksTree);
     ConnectTracksBranches();
 
-    Int_t True_PdgCode;
-    UInt_t MotherMcIdx;
-    UInt_t Aux_McIdx;
-    UInt_t ReactionID;
+    fTree_Tracks->SetBranchStatus("*", 0);
+    fTree_Tracks->SetBranchStatus("Idx", 1);
+    fTree_Tracks->SetBranchStatus("Charge", 1);
+    fTree_Tracks->SetBranchStatus("NSigmaProton", 1);
+    fTree_Tracks->SetBranchStatus("NSigmaKaon", 1);
+    fTree_Tracks->SetBranchStatus("NSigmaPion", 1);
+    fTree_Tracks->SetBranchStatus("Idx_True", 1);
 
-    for (Long64_t track_entry = 0; track_entry < GetN_Tracks(); track_entry++) {
-        if (!ReadTrack(track_entry)) continue;
+    for (Long64_t Track_Entry = 0; Track_Entry < GetN_Tracks(); Track_Entry++) {
+        if (!ReadTrack(Track_Entry)) continue;
         /* Fill containers */
-        getTrackEntry_fromEsdIdx[Track.Idx] = track_entry;
-        getMcIdx_fromEsdIdx[Track.Idx] = Track.Idx_True;
-        if (GetMotherMcIdx(Track.Idx_True, MotherMcIdx)) {
-            if (GetNegDauMcIdx(MotherMcIdx, Aux_McIdx)) {
-                if (Aux_McIdx == Track.Idx_True) getNegDauEsdIdx_fromMcIdx[MotherMcIdx] = Track.Idx;
-            }
-            if (GetPosDauMcIdx(MotherMcIdx, Aux_McIdx)) {
-                if (Aux_McIdx == Track.Idx_True) getPosDauEsdIdx_fromMcIdx[MotherMcIdx] = Track.Idx;
-            }
-        }
-        if (GetReactionID(Track.Idx_True, ReactionID)) {
-            getEsdIndices_fromReactionID[ReactionID].push_back(Track.Idx);
+        getTrackEntry_fromEsdIdx[Track.Idx] = Track_Entry;
+        getEsdIdx_fromTrackEntry[Track_Entry] = Track.Idx;
+        if (Settings::IsMC) {
+            getMcIdx_fromEsdIdx[Track.Idx] = Track.Idx_True;
+            getEsdIdx_fromMcIdx[Track.Idx_True] = Track.Idx;
         }
         /* PID */
-        if (!GetPdgCode(Track.Idx_True, True_PdgCode)) continue;
-        if (True_PdgCode == -2212) esdIndicesOfAntiProtonTracks.push_back(Track.Idx);
-        if (True_PdgCode == 2212) esdIndicesOfProtonTracks.push_back(Track.Idx);
-        if (True_PdgCode == -321) esdIndicesOfNegKaonTracks.push_back(Track.Idx);
-        if (True_PdgCode == 321) esdIndicesOfPosKaonTracks.push_back(Track.Idx);
-        if (True_PdgCode == -211) esdIndicesOfPiMinusTracks.push_back(Track.Idx);
-        if (True_PdgCode == 211) esdIndicesOfPiPlusTracks.push_back(Track.Idx);
-    }
+        if (TMath::Abs(Track.NSigmaProton) < Default::Proton::MaxNSigma) {
+            if (Track.Charge < 0)
+                TrackEntries_AntiProton.push_back(Track_Entry);
+            else
+                TrackEntries_Proton.push_back(Track_Entry);
+        }
+        if (TMath::Abs(Track.NSigmaKaon) < Default::Kaon::MaxNSigma) {
+            if (Track.Charge < 0)
+                TrackEntries_NegKaon.push_back(Track_Entry);
+            else
+                TrackEntries_PosKaon.push_back(Track_Entry);
+        }
+        if (TMath::Abs(Track.NSigmaPion) < Default::Pion::MaxNSigma) {
+            if (Track.Charge < 0)
+                TrackEntries_PiMinus.push_back(Track_Entry);
+            else
+                TrackEntries_PiPlus.push_back(Track_Entry);
+        }
+    }  // end of loop over tracks
+    InfoF("N Found AntiProtons: %lu", TrackEntries_AntiProton.size());
+    InfoF("N Found Protons: %lu", TrackEntries_Proton.size());
+    InfoF("N Found Negative Kaons: %lu", TrackEntries_NegKaon.size());
+    InfoF("N Found Positive Kaons: %lu", TrackEntries_PosKaon.size());
+    InfoF("N Found Negative Pions: %lu", TrackEntries_PiMinus.size());
+    InfoF("N Found Positive Pions: %lu", TrackEntries_PiPlus.size());
 }
 
 /*         */
@@ -207,168 +216,210 @@ void Manager::ProcessTracks() {
  */
 void Manager::ProcessFindableV0s() {
     //
-    Int_t V0_PdgCode, Neg_PdgCode, Pos_PdgCode;
+    fTree_MC->SetBranchStatus("*", 0);
+    fTree_MC->SetBranchStatus("Idx", 1);
+    fTree_MC->SetBranchStatus("PdgCode", 1);
+    fTree_MC->SetBranchStatus("Generator", 1);
+    fTree_MC->SetBranchStatus("Idx_Ancestor", 1);
+
+    fTree_Tracks->SetBranchStatus("*", 0);
+    fTree_Tracks->SetBranchStatus("Idx", 1);
+
+    Bool_t V0_IsSignal;
+    UInt_t V0_McIdx;
+    Int_t V0_PdgCode;
+
+    Long64_t Neg_McEntry, Pos_McEntry;
     UInt_t Neg_McIdx, Pos_McIdx;
+    Int_t Neg_PdgCode, Pos_PdgCode;
+
+    Long64_t Neg_TrackEntry, Pos_TrackEntry;
     UInt_t Neg_EsdIdx, Pos_EsdIdx;
 
-    for (UInt_t& V0_McIdx : mcIndicesOfTrueV0s) {
+    for (Long64_t& V0_McEntry : mcEntriesOfTrueV0s) {
+        if (!ReadMCParticle(V0_McEntry)) continue;
+        V0_McIdx = MC.Idx;
+        V0_PdgCode = MC.PdgCode;
+        V0_IsSignal = MC_IsSignal();
         //
-        if (!GetPdgCode(V0_McIdx, V0_PdgCode)) continue;
-        if (!GetNegDauMcIdx(V0_McIdx, Neg_McIdx)) continue;
-        if (!GetPosDauMcIdx(V0_McIdx, Pos_McIdx)) continue;
-        if (!GetPdgCode(Neg_McIdx, Neg_PdgCode)) continue;
-        if (!GetPdgCode(Pos_McIdx, Pos_PdgCode)) continue;
-        if (!GetNegDauEsdIdx(V0_McIdx, Neg_EsdIdx)) continue;
-        if (!GetPosDauEsdIdx(V0_McIdx, Pos_EsdIdx)) continue;
+        Neg_McEntry = GetMcEntryNeg(V0_McEntry);
+        if (!ReadMCParticle(Neg_McEntry)) continue;
+        Neg_McIdx = MC.Idx;
+        Neg_PdgCode = MC.PdgCode;
+        Neg_TrackEntry = GetTrackEntryFromMcEntry(Neg_McEntry);
+        if (!ReadTrack(Neg_TrackEntry)) continue;
+        Neg_EsdIdx = Track.Idx;
         //
-        InfoF("mom: %u, %i, %i, neg: %u, %i, %u, pos: %u, %i, %u",  //
-              V0_McIdx, V0_PdgCode, (Int_t)IsSignal(V0_McIdx),      //
-              Neg_McIdx, Neg_PdgCode, Neg_EsdIdx,                   //
+        Pos_McEntry = GetMcEntryPos(V0_McEntry);
+        if (!ReadMCParticle(Pos_McEntry)) continue;
+        Pos_McIdx = MC.Idx;
+        Pos_PdgCode = MC.PdgCode;
+        Pos_TrackEntry = GetTrackEntryFromMcEntry(Pos_McEntry);
+        if (!ReadTrack(Pos_TrackEntry)) continue;
+        Pos_EsdIdx = Track.Idx;
+        //
+        InfoF("v0: mcidx=%u, pdg=%i, signal=%i, neg: mcidx=%u, pdg=%i, esdidx=%u, pos: mcidx=%u, pdg=%i, esdidx=%u",  //
+              V0_McIdx, V0_PdgCode, V0_IsSignal,                                                                      //
+              Neg_McIdx, Neg_PdgCode, Neg_EsdIdx,                                                                     //
               Pos_McIdx, Pos_PdgCode, Pos_EsdIdx);
-    }
+    }  // end of loop over true V0s
 }
 
 /*
  * Find all V0s via Kalman Filter.
- * Note: if `pdgV0 == -1` (default value), it will store K0S candidates and secondary pion pairs.
  */
 void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
-
+    //
     Track_tt TrackNeg, TrackPos;
-    UInt_t mcIdxNeg, mcIdxPos;
-    Int_t mcIdxV0;
-
+    fTree_Tracks->SetBranchStatus("*", 0);
+    fTree_Tracks->SetBranchStatus("Idx", 1);
+    fTree_Tracks->SetBranchStatus("Px", 1);
+    fTree_Tracks->SetBranchStatus("Py", 1);
+    fTree_Tracks->SetBranchStatus("Pz", 1);
+    fTree_Tracks->SetBranchStatus("X", 1);
+    fTree_Tracks->SetBranchStatus("Y", 1);
+    fTree_Tracks->SetBranchStatus("Z", 1);
+    fTree_Tracks->SetBranchStatus("Charge", 1);
+    fTree_Tracks->SetBranchStatus("Alpha", 1);
+    fTree_Tracks->SetBranchStatus("Snp", 1);
+    fTree_Tracks->SetBranchStatus("Tgl", 1);
+    fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
+    fTree_Tracks->SetBranchStatus("CovMatrix", 1);
     /* Declare KFParticle objects */
-
     KFParticle kfNeg, kfPos;
     KFParticle kfTransportedNeg, kfTransportedPos;
-
     /* Declare 4-momentum vectors */
-
     ROOT::Math::PxPyPzEVector lvNeg, lvPos;
     ROOT::Math::PxPyPzEVector lvV0;
-
+    /* Declare the V0 object */
+    Particle::V0 newV0;
+    newV0.SetPrimaryVertex(kfPrimaryVertex);
     /* Information from MC */
-
     Bool_t is_true;
+    Int_t mc_idx_v0;
+    Int_t mc_pdg_code;
     Bool_t is_secondary;
     Bool_t is_signal;
     Int_t reaction_id;
     Bool_t is_hybrid;
-
     /* Choose tracks species to loop over */
-
-    std::vector<UInt_t> esdIndicesNegTracks;
-    std::vector<UInt_t> esdIndicesPosTracks;
+    std::vector<Long64_t> TrackEntries_Neg;
+    std::vector<Long64_t> TrackEntries_Pos;
     if (pdgV0 == -3122) {
-        esdIndicesNegTracks = esdIndicesOfAntiProtonTracks;
-        esdIndicesPosTracks = esdIndicesOfPiPlusTracks;
+        TrackEntries_Neg = TrackEntries_AntiProton;
+        TrackEntries_Pos = TrackEntries_PiPlus;
     } else if (pdgV0 == 3122) {
-        esdIndicesNegTracks = esdIndicesOfPiMinusTracks;
-        esdIndicesPosTracks = esdIndicesOfProtonTracks;
+        TrackEntries_Neg = TrackEntries_PiMinus;
+        TrackEntries_Pos = TrackEntries_Proton;
     } else {
-        esdIndicesNegTracks = esdIndicesOfPiMinusTracks;
-        esdIndicesPosTracks = esdIndicesOfPiPlusTracks;
+        /* For KaonsZeroShort and PionPairs */
+        TrackEntries_Neg = TrackEntries_PiMinus;
+        TrackEntries_Pos = TrackEntries_PiPlus;
     }
-
     /* Loop over all possible pairs of tracks */
-
-    for (UInt_t& esdIdxNeg : esdIndicesNegTracks) {
-        for (UInt_t& esdIdxPos : esdIndicesPosTracks) {
-
+    for (Long64_t& Neg_Entry : TrackEntries_Neg) {
+        for (Long64_t& Pos_Entry : TrackEntries_Pos) {
             /* Sanity check: prevent tracks from being repeated */
-
-            if (esdIdxNeg == esdIdxPos) continue;
-
+            if (Neg_Entry == Pos_Entry) continue;
             /* Get tracks */
-
-            GetTrack(esdIdxNeg, TrackNeg);
-            GetTrack(esdIdxPos, TrackPos);
-
+            if (!CopyTrack(Neg_Entry, TrackNeg)) continue;
+            if (!CopyTrack(Pos_Entry, TrackPos)) continue;
             /* Kalman Filter */
-
             kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNeg)->Mass());
             kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPos)->Mass());
-
             KFParticle kfV0;
             kfV0.AddDaughter(kfNeg);
             kfV0.AddDaughter(kfPos);
-
             /* Transport V0 and daughters */
-
             kfV0.TransportToDecayVertex();
             kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdgNeg)->Mass(),  //
                                                          (Int_t)TrackNeg.Charge);
             kfTransportedPos = Math::TransportKFParticle(kfPos, kfNeg, fPDG.GetParticle(pdgPos)->Mass(),  //
                                                          (Int_t)TrackPos.Charge);
-
             /* Reconstruct V0 */
-
-            lvNeg = ROOT::Math::PxPyPzMVector(kfNeg.Px(), kfNeg.Py(), kfNeg.Pz(), fPDG.GetParticle(pdgNeg)->Mass());
-            lvPos = ROOT::Math::PxPyPzMVector(kfPos.Px(), kfPos.Py(), kfPos.Pz(), fPDG.GetParticle(pdgPos)->Mass());
+            lvNeg = ROOT::Math::PxPyPzMVector(kfTransportedNeg.Px(), kfTransportedNeg.Py(), kfTransportedNeg.Pz(), fPDG.GetParticle(pdgNeg)->Mass());
+            lvPos = ROOT::Math::PxPyPzMVector(kfTransportedPos.Px(), kfTransportedPos.Py(), kfTransportedPos.Pz(), fPDG.GetParticle(pdgPos)->Mass());
             lvV0 = lvNeg + lvPos;
-
-            /* Optimization: if `pdgV0 == -1`, use the same pi+pi- loop to process both K0S and pi+pi- coming from a signal reaction */
-
-            std::vector<Int_t> pdgV0s = {pdgV0};
-            if (pdgV0 == -1) pdgV0s = {310, 422};
-
-            for (Int_t& auxPdgV0 : pdgV0s) {
-
-                /* Collect true information */
-
-                UInt_t mc_neg_mc_mother, mc_pos_mc_mother;
-                Int_t mc_pdg_mother;
-
-                if (!GetMcIdx(esdIdxNeg, mcIdxNeg) || !GetMcIdx(esdIdxPos, mcIdxPos)) continue;
-                if (!GetMotherMcIdx(mcIdxNeg, mc_neg_mc_mother) || !GetMotherMcIdx(mcIdxPos, mc_pos_mc_mother)) continue;
-
-                /* DEBUG: select only true V0s */
-
-                if (mc_neg_mc_mother != mc_pos_mc_mother) continue;
-                if (!GetPdgCode(mc_neg_mc_mother, mc_pdg_mother)) continue;
-                if (mc_pdg_mother != auxPdgV0) continue;
-
-                /*
-                mcIdxPos = getMcIdx_fromEsdIdx[esdIdxPos];
-                mcIdxV0 = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
-                                    getMotherMcIdx_fromMcIdx[mcIdxNeg] == getMotherMcIdx_fromMcIdx[mcIdxPos]
-                                ? getMotherMcIdx_fromMcIdx[mcIdxNeg]
-                                : -1;
-                mc_pdg_code = mcIdxV0 >= 0 ? getPdgCode_fromMcIdx[mcIdxV0] : -1;
-                */
-                /** Note: different treatment for pion pairs, since they don't have a true MC V0 **/
-                /*
-                if (auxPdgV0 == 422) {
-                    is_true = !doesMcIdxHaveMother[mcIdxNeg] && !doesMcIdxHaveMother[mcIdxPos] &&  //
-                                getPdgCode_fromMcIdx[mcIdxNeg] == pdgNegDaughter && getPdgCode_fromMcIdx[mcIdxPos] == pdgPosDaughter;
-                    is_secondary = isMcIdxSecondary[mcIdxNeg] && isMcIdxSecondary[mcIdxPos] && is_true;
-                    is_signal = isMcIdxSignal[mcIdxNeg] && isMcIdxSignal[mcIdxPos] &&                      //
-                                getReactionID_fromMcIdx[mcIdxNeg] == getReactionID_fromMcIdx[mcIdxPos] &&  //
-                                is_secondary;
-                    reaction_id = is_signal ? getReactionID_fromMcIdx[mcIdxNeg] : -1;
-                } else {
-                    is_true = doesMcIdxHaveMother[mcIdxNeg] && doesMcIdxHaveMother[mcIdxPos] &&
-                                getMotherMcIdx_fromMcIdx[mcIdxNeg] == getMotherMcIdx_fromMcIdx[mcIdxPos] && //
-                                getPdgCode_fromMcIdx[mcIdxNeg] == pdgNegDaughter && getPdgCode_fromMcIdx[mcIdxPos] == pdgPosDaughter &&
-                // mc_pdg_code == auxPdgV0; is_secondary = isMcIdxSecondary[mcIdxV0] && is_true; is_signal = isMcIdxSignal[mcIdxV0] &&
-                is_secondary; reaction_id = getReactionID_fromMcIdx[mcIdxV0];
-                            }
-                            is_hybrid = (isMcIdxSignal[mcIdxNeg] || isMcIdxSignal[mcIdxPos]) && !is_signal;
-                */
-                /* Apply cuts and store V0 */
-
-                Particle::V0 ThisV0(auxPdgV0, esdIdxNeg, esdIdxPos,  //
-                                    lvV0, lvNeg, lvPos,              //
-                                    kfV0, kfTransportedNeg, kfTransportedPos, kfPrimaryVertex);
-
-                if (!Inspector.Approve(ThisV0)) continue;
-
-                FillV0(1, ThisV0);
-                InfoF("%u, %u, %u, %u, %u, %i, %f", esdIdxNeg, esdIdxPos, mcIdxNeg, mcIdxPos, mc_neg_mc_mother, mc_pdg_mother, lvV0.M());
-            }
+            /* Prepare V0 object */
+            newV0.SetKinematics(lvV0, lvNeg, lvPos);
+            newV0.SetGeometry(kfV0, kfTransportedNeg, kfTransportedPos);
+            newV0.SetV0Info(pdgV0, TrackNeg.Idx, TrackPos.Idx);
+            // if (Settings::IsMC) {
+            // CollectTrueV0(pdgV0, TrackNeg.Idx, TrackPos.Idx, is_true, mc_idx_v0, mc_pdg_code, is_secondary, is_signal, reaction_id,
+            //   is_hybrid);
+            // newV0.SetTrueInfo(is_true, mc_idx_v0, mc_pdg_code, is_secondary, is_signal, reaction_id, is_hybrid);
+            // }
+            /* Apply cuts and store V0 */
+            if (!Inspector.Approve(newV0)) continue;
+            if (pdgV0 == -3122)
+                AntiLambdas.push_back(newV0);
+            else if (pdgV0 == 3122)
+                Lambdas.push_back(newV0);
+            else if (pdgV0 == 310)
+                KaonsZeroShort.push_back(newV0);
+            else if (pdgV0 == 422)
+                PionPairs.push_back(newV0);
+            FillV0(1, newV0);
+            // InfoF("(pdg=%i) mass=%f, radius=%f", pdgV0, newV0.Mass(), newV0.Radius());
         }  // end of loop over pos. tracks
     }      // end of loop over neg. tracks
+    if (pdgV0 == -3122)
+        InfoF("N Found AntiLambdas: %lu", AntiLambdas.size());
+    else if (pdgV0 == 3122)
+        InfoF("N Found Lambdas: %lu", Lambdas.size());
+    else if (pdgV0 == 310)
+        InfoF("N Found KaonsZeroShort: %lu", KaonsZeroShort.size());
+    else if (pdgV0 == 422)
+        InfoF("N Found PionPairs: %lu", PionPairs.size());
+}
+
+/*
+ *
+ */
+void Manager::CollectTrueV0(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos, Bool_t& isTrue, Int_t& mcIdxV0, Int_t& mcPdgCode,
+                            Bool_t& isSecondary, Bool_t& isSignal, Int_t& reactionID, Bool_t& isHybrid) {
+    // /* -- By default */
+    // isTrue = kFALSE;
+    // mcIdxV0 = -1;
+    // mcPdgCode = 0;
+    // isSecondary = kFALSE;
+    // isSignal = kFALSE;
+    // reactionID = -1;
+    // isHybrid = kFALSE;
+    // /* -- Get MC particles linked to tracks */
+    // UInt_t mcIdxNeg, mcIdxPos;
+    // Bool_t hasMcNeg = GetMcIdx(esdIdxNeg, mcIdxNeg);
+    // Bool_t hasMcPos = GetMcIdx(esdIdxPos, mcIdxPos);
+    // /* -- Get mothers of MC particles */
+    // UInt_t mcIdxMotherNeg, mcIdxMotherPos;
+    // Bool_t hasMotherNeg = hasMcNeg && GetMotherMcIdx(mcIdxNeg, mcIdxMotherNeg);
+    // Bool_t hasMotherPos = hasMcPos && GetMotherMcIdx(mcIdxPos, mcIdxMotherPos);
+    // /* Note: different treatment for Pion Pairs */
+    // if (pdgHypothesis == 422) {
+    // /* -- Determine if it's a true V0 */
+    // isTrue = !hasMotherNeg && !hasMotherPos && GetPdgCode(mcIdxNeg) == -211 && GetPdgCode(mcIdxPos) == 211;
+    // if (isTrue) {
+    // isSecondary = IsSecondary(mcIdxNeg) && IsSecondary(mcIdxPos);
+    // isSignal = IsSignal(mcIdxNeg) && IsSignal(mcIdxPos) && GetReactionID(mcIdxNeg) == GetReactionID(mcIdxPos);
+    // if (isSignal)
+    // reactionID = GetReactionID(mcIdxNeg);
+    // else
+    // isHybrid = (IsSignal(mcIdxNeg) && !IsSignal(mcIdxPos)) || (!IsSignal(mcIdxNeg) && IsSignal(mcIdxPos));
+    // }
+    // } else {
+    // /* -- Determine if it's a true V0 */
+    // isTrue = hasMotherNeg && hasMotherPos && mcIdxMotherNeg == mcIdxMotherPos && getPdgCode_fromMcIdx[mcIdxMotherNeg] == pdgHypothesis;
+    // if (isTrue) {
+    // mcIdxV0 = mcIdxMotherNeg;
+    // mcPdgCode = getPdgCode_fromMcIdx[mcIdxV0];
+    // isSecondary = isMcIdxSecondary[mcIdxV0];
+    // isSignal = IsSignal(mcIdxV0);
+    // if (isSignal)
+    // reactionID = GetReactionID(mcIdxV0);
+    // else
+    // isHybrid = (IsSignal(mcIdxNeg) && !IsSignal(mcIdxPos)) || (!IsSignal(mcIdxNeg) && IsSignal(mcIdxPos));
+    // }
+    // }
 }
 
 /*                */
@@ -380,33 +431,53 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
  */
 void Manager::ProcessFindableSexaquarks() {
     //
+    std::unordered_multiset<Int_t> PdgCodes_Expected = {-2212, 211, -211, 211};
+    /*
+    // PENDING
     Int_t PdgCode_StruckNucleon = 2112;
-    std::vector<Int_t> PdgCodes_FinalStateProducts = {-2212, 211, -211, 211};
+    if (fReactionChannel == "ALK0") {
+        PdgCode_StruckNucleon = 2112;
+        PdgCodes_FinalStateProducts = {-2212, 211, -211, 211};
+    } else if (fReactionChannel == "ALPK") {
+        PdgCodes_FinalStateProducts = {-2212, 211, 321};
+    } else if (fReactionChannel == "ALPKPP") {
+        PdgCodes_FinalStateProducts = {-2212, 211, 321, -211, 211};
+    } else if (fReactionChannel == "PKPKX") {
+        PdgCodes_FinalStateProducts = {321, 321};
+    }
+    */
 
-    Long64_t track_entry;
-    Int_t pdg_code;
+    fTree_Injected->SetBranchStatus("*", 0);
+    fTree_Injected->SetBranchStatus("ReactionID", 1);
 
-    for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
-        if (!ReadInjected(sexa_entry)) continue;
+    fTree_MC->SetBranchStatus("*", 0);
+    fTree_MC->SetBranchStatus("PdgCode", 1);
 
-        /* All final state products should have been reconstructed and passed track selection */
+    fTree_Tracks->SetBranchStatus("*", 0);
+    fTree_Tracks->SetBranchStatus("Px", 1);
+    fTree_Tracks->SetBranchStatus("Py", 1);
+    fTree_Tracks->SetBranchStatus("Pz", 1);
 
-        std::unordered_multiset<Int_t> pdg_reconstructed_particles;
-        for (UInt_t& EsdIdx : getEsdIndices_fromReactionID[Injected.ReactionID]) {
-            pdg_reconstructed_particles.insert(getPdgCode_fromMcIdx[getMcIdx_fromEsdIdx[EsdIdx]]);
+    for (Long64_t Reaction_Entry = 0; Reaction_Entry < GetN_Injected(); Reaction_Entry++) {
+        if (!ReadInjected(Reaction_Entry)) continue;
+        std::vector<Long64_t> Track_Entries;
+        std::unordered_multiset<Int_t> PdgCodes_Reconstructed;
+        /* Loop over MC */
+        for (Long64_t& MC_Entry : getMcEntries_fromReactionID[Injected.ReactionID]) {
+            if (!ReadMCParticle(MC_Entry)) continue;
+            /* -- Condition: should've been reconstructed */
+            Long64_t Track_Entry = GetTrackEntryFromMcEntry(MC_Entry);
+            if (!ReadTrack(Track_Entry)) continue;
+            Track_Entries.push_back(Track_Entry);
+            PdgCodes_Reconstructed.insert(MC.PdgCode);
         }
-
-        std::unordered_multiset<Int_t> expected_pdg_fs_particles(PdgCodes_FinalStateProducts.begin(), PdgCodes_FinalStateProducts.end());
-
-        if (expected_pdg_fs_particles != pdg_reconstructed_particles) continue;
-
-        /** Loop, to get the reconstructed final-state particles info **/
-
-        for (UInt_t& EsdIdx : getEsdIndices_fromReactionID[Injected.ReactionID]) {
-            if (!GetTrackEntry(EsdIdx, track_entry)) continue;
-            ReadTrack(track_entry);
-            if (!GetPdgCode(Track.Idx_True, pdg_code)) continue;
-            InfoF("%i, %u, %u, %i, %f, %f, %f", Injected.ReactionID, EsdIdx, Track.Idx_True, pdg_code, Track.Px, Track.Py, Track.Pz);
+        /* It should match the expected final state products */
+        if (PdgCodes_Reconstructed != PdgCodes_Expected) continue;
+        /* Loop over Tracks */
+        for (Long64_t& Track_Entry : Track_Entries) {
+            if (!ReadTrack(Track_Entry)) continue;
+            if (!ReadMCParticle(GetMcEntryFromTrackEntry(Track_Entry))) continue;
+            InfoF("ReactionID=%u, PdgCode=%i, Px=%f, Py=%f, Pz=%f", Injected.ReactionID, MC.PdgCode, Track.Px, Track.Py, Track.Pz);
         }
     }
 }
@@ -457,32 +528,29 @@ void Manager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts
  */
 void Manager::CleanContainers() {
     //
+    getMcIdx_FromMcEntry.clear();
     getMcEntry_fromMcIdx.clear();
-    getPdgCode_fromMcIdx.clear();
-    isMcIdxSignal.clear();
-    isMcIdxSecondary.clear();
-    getReactionID_fromMcIdx.clear();
-    getMcIndices_fromReactionID.clear();
-    getMotherMcIdx_fromMcIdx.clear();
-    getAncestorMcIdx_fromMcIdx.clear();
-    getNegDauMcIdx_fromMcIdx.clear();
-    getPosDauMcIdx_fromMcIdx.clear();
+    mcEntriesOfTrueV0s.clear();
+    getMcIdxNeg_fromMcIdx.clear();
+    getMcIdxPos_fromMcIdx.clear();
+    getMcEntries_fromReactionID.clear();
     //
     getTrackEntry_fromEsdIdx.clear();
+    getEsdIdx_fromTrackEntry.clear();
     getMcIdx_fromEsdIdx.clear();
+    getEsdIdx_fromMcIdx.clear();
     //
-    esdIndicesOfAntiProtonTracks.clear();
-    esdIndicesOfProtonTracks.clear();
-    esdIndicesOfNegKaonTracks.clear();
-    esdIndicesOfPosKaonTracks.clear();
-    esdIndicesOfPiMinusTracks.clear();
-    esdIndicesOfPiPlusTracks.clear();
+    TrackEntries_AntiProton.clear();
+    TrackEntries_Proton.clear();
+    TrackEntries_NegKaon.clear();
+    TrackEntries_PosKaon.clear();
+    TrackEntries_PiMinus.clear();
+    TrackEntries_PiPlus.clear();
     //
-    mcIndicesOfTrueV0s.clear();
-    getNegDauEsdIdx_fromMcIdx.clear();
-    getPosDauEsdIdx_fromMcIdx.clear();
-    //
-    getEsdIndices_fromReactionID.clear();
+    AntiLambdas.clear();
+    Lambdas.clear();
+    KaonsZeroShort.clear();
+    PionPairs.clear();
 }
 
 /*

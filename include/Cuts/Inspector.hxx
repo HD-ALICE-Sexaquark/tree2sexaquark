@@ -33,14 +33,14 @@ class Inspector {
     void AddCut(V0::Species species, TString name, Particle::V0::MemFn expression, Double_t value, Limit limit_type) {
         Cut<Particle::V0> cut(name, expression, value, limit_type);
         if (species == V0::Species::Lambda) fCuts_Lambda.push_back(cut);
-        if (species == V0::Species::KaonZero) fCuts_KaonZero.push_back(cut);
+        if (species == V0::Species::KaonZeroShort) fCuts_KaonZero.push_back(cut);
         if (species == V0::Species::PionPair) fCuts_PionPair.push_back(cut);
     }
 
     void AddCut(V0::Species species, TString name, Particle::V0::MemFn expression, Double_t min, Double_t max) {
         Cut<Particle::V0> cut(name, expression, min, max);
         if (species == V0::Species::Lambda) fCuts_Lambda.push_back(cut);
-        if (species == V0::Species::KaonZero) fCuts_KaonZero.push_back(cut);
+        if (species == V0::Species::KaonZeroShort) fCuts_KaonZero.push_back(cut);
         if (species == V0::Species::PionPair) fCuts_PionPair.push_back(cut);
     }
 
@@ -80,11 +80,10 @@ class Inspector {
     Bool_t ApproveParticle(Particle& candidate, std::vector<Cut<Particle>>& CutsCollection) {
         for (auto cut : CutsCollection) {
             if (!cut.Check(candidate)) {
-                InfoF("Particle rejected. It didn't satisfy: %s", cut.GetInfo().Data());
+                // InfoF("Particle rejected. It didn't satisfy: %s (=%f)", cut.GetInfo().Data(), cut.Evaluate(candidate));
                 return kFALSE;
             }
         }
-        InfoF("Particle approved. Glory to Arstotzka. %s", "");
         return kTRUE;
     }
 

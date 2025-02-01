@@ -20,7 +20,7 @@ namespace Tree2Sexaquark {
 namespace V0 {
 enum class Species {
     Lambda = 3122,
-    KaonZero = 310,
+    KaonZeroShort = 310,
     PionPair = 422,
 };
 }  // namespace V0
@@ -32,11 +32,12 @@ namespace Particle {
  */
 class V0 : public Base {
    public:
-    V0(Int_t PdgCode, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                                 //
+    V0() = default;
+    V0(Int_t pdgHypothesis, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                           //
        ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos,  //
        KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos, KFVertex kfPV)
         : Base(lvV0, kfV0, kfPV),  //
-          PdgCode(PdgCode),
+          PdgCode(pdgHypothesis),
           EsdIdxNeg(EsdIdxNeg),
           EsdIdxPos(EsdIdxPos),
           /*  */
@@ -52,12 +53,12 @@ class V0 : public Base {
           IsSignal(0),
           ReactionID(0),
           IsHybrid(0) {}
-    V0(Int_t PdgCode, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                                 //
+    V0(Int_t pdgHypothesis, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                           //
        ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos,  //
        KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos, KFVertex kfPV,                                //
        Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t reactionID, Bool_t isHybrid)
         : Base(lvV0, kfV0, kfPV),  //
-          PdgCode(PdgCode),
+          PdgCode(pdgHypothesis),
           EsdIdxNeg(EsdIdxNeg),
           EsdIdxPos(EsdIdxPos),
           /*  */
@@ -75,6 +76,33 @@ class V0 : public Base {
           IsHybrid(isHybrid) {}
     ~V0() = default;
 
+    /* --Setters */
+    void SetV0Info(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos) {
+        PdgCode = pdgHypothesis;
+        EsdIdxNeg = esdIdxNeg;
+        EsdIdxPos = esdIdxPos;
+    }
+    void SetKinematics(ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos) {
+        lvThis = lvV0;
+        lvNeg = lvNeg;
+        lvPos = lvPos;
+    }
+    void SetGeometry(KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos) {
+        kfThis = kfV0;
+        v3This = ROOT::Math::XYZPoint(kfThis.GetX(), kfThis.GetY(), kfThis.GetZ());
+        kfNeg = kfNeg;
+        kfPos = kfPos;
+    }
+    void SetTrueInfo(Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t reactionID, Bool_t isHybrid) {
+        IsTrue = isTrue;
+        McIdxV0 = mcIdxV0;
+        McPdgCode = mcPdgCode;
+        IsSecondary = isSecondary;
+        IsSignal = isSignal;
+        ReactionID = reactionID;
+        IsHybrid = isHybrid;
+    }
+
     inline Double_t NegPx() { return lvNeg.Px(); }
     inline Double_t NegPy() { return lvNeg.Py(); }
     inline Double_t NegPz() { return lvNeg.Pz(); }
@@ -86,8 +114,8 @@ class V0 : public Base {
     inline Double_t DCAbtwDau() { return TMath::Abs((Double_t)kfNeg.GetDistanceFromParticle(kfPos)); }
     inline Double_t DCAnegV0() { return TMath::Abs((Double_t)kfNeg.GetDistanceFromVertex(kfThis)); }
     inline Double_t DCAposV0() { return TMath::Abs((Double_t)kfPos.GetDistanceFromVertex(kfThis)); }
-    inline Double_t ArmQt() { return Math::ArmenterosQt(GetMomentumVector(), lvNeg.Vect()); }
-    inline Double_t ArmAlpha() { return Math::ArmenterosAlpha(GetMomentumVector(), lvNeg.Vect(), lvPos.Vect()); }
+    inline Double_t ArmQt() { return Math::ArmenterosQt(lvThis.Vect(), lvNeg.Vect()); }
+    inline Double_t ArmAlpha() { return Math::ArmenterosAlpha(lvThis.Vect(), lvNeg.Vect(), lvPos.Vect()); }
     inline Double_t ArmQtOverAlpha() { return ArmQt() / TMath::Abs(ArmAlpha()); }
 
     typedef Double_t (V0::*MemFn)();
