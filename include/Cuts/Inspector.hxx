@@ -1,103 +1,196 @@
 #ifndef T2S_CUTS_INSPECTOR_HXX
 #define T2S_CUTS_INSPECTOR_HXX
 
-#include <vector>
-
-#include "Utilities/Logger.hxx"
-
-#include "Cuts/Cut.hxx"
-#include "Particles/V0.hxx"
+#include <unordered_map>
 
 #include "Particles/ChannelA.hxx"
 #include "Particles/ChannelD.hxx"
 #include "Particles/ChannelE.hxx"
 #include "Particles/KaonPair.hxx"
+#include "Particles/V0.hxx"
 
 namespace Tree2Sexaquark {
-namespace Cuts {
+class Cut {
+   public:
+    enum class Limit : Short_t {  //
+        Minimum,
+        Maximum,
+        AbsoluteMax
+    };
 
-/*
- * Store and apply cuts.
- */
+    Cut() = default;
+    ~Cut() = default;
+    Cut(Double_t minimum, Double_t maximum)
+        : fIsOn(kTRUE),  //
+          fMinimum(minimum),
+          fMinimumDefined(kTRUE),
+          fMaximum(maximum),
+          fMaximumDefined(kTRUE) {}
+    Cut(Double_t value, Limit limit_type)
+        : fIsOn(kTRUE),  //
+          fMinimum(0.),
+          fMinimumDefined(kFALSE),
+          fMaximum(0.),
+          fMaximumDefined(kFALSE) {
+        ModifyTo(value, limit_type);
+    }
+
+    void ModifyTo(Double_t minimum, Double_t maximum) {
+        fMinimum = minimum;
+        fMinimumDefined = kTRUE;
+        fMaximum = maximum;
+        fMaximumDefined = kTRUE;
+    }
+    void ModifyTo(Double_t value, Limit limit_type) {
+        if (limit_type == Limit::Minimum) {
+            fMinimum = value;
+            fMinimumDefined = kTRUE;
+        } else if (limit_type == Limit::Maximum) {
+            fMaximum = value;
+            fMaximumDefined = kTRUE;
+        } else if (limit_type == Limit::AbsoluteMax) {
+            fMinimum = -value;
+            fMinimumDefined = kTRUE;
+            fMaximum = value;
+            fMaximumDefined = kTRUE;
+        }
+    }
+
+    inline Bool_t Apply(Double_t value) const {
+        if (!fIsOn) return kTRUE;
+        if (fMinimumDefined && value < fMinimum) return kFALSE;
+        if (fMaximumDefined && value > fMaximum) return kFALSE;
+        return kTRUE;
+    }
+
+    inline Bool_t IsOn() const { return fIsOn; }
+    void TurnOff() { fIsOn = kFALSE; }
+
+    std::string ToString() const {
+        std::string str = "";
+        if (fMinimumDefined) {
+            str += "Min: " + std::to_string(fMinimum);
+        }
+        if (fMaximumDefined) {
+            str += " Max: " + std::to_string(fMaximum);
+        }
+        return str;
+    }
+
+   private:
+    Bool_t fIsOn;
+    Double_t fMinimum;
+    Bool_t fMinimumDefined;
+    Double_t fMaximum;
+    Bool_t fMaximumDefined;
+};
+
+namespace Cuts {
 class Inspector {
+    using V0 = Candidate::V0;
+    using Sexaquark = Candidate::Sexaquark;
+
    public:
     Inspector() = default;
     ~Inspector() = default;
 
-    /* V0s */
+    void InitDefaultCuts_V0();
+    void InitDefaultCuts_Sexaquark();
 
-    void SetLambdaDefaultCuts();
-    void SetKaonZeroDefaultCuts();
-    void SetPionPairDefaultCuts();
-
-    void AddCut(V0::Species species, TString name, Particle::V0::MemFn expression, Double_t value, Limit limit_type) {
-        Cut<Particle::V0> cut(name, expression, value, limit_type);
-        if (species == V0::Species::Lambda) fCuts_Lambda.push_back(cut);
-        if (species == V0::Species::KaonZeroShort) fCuts_KaonZero.push_back(cut);
-        if (species == V0::Species::PionPair) fCuts_PionPair.push_back(cut);
+    void AddCut(V0::Species species, std::string cut_name, Double_t minimum, Double_t maximum) {
+        if (species == V0::Species::Lambda) {
+            Lambda_[cut_name] = Cut(minimum, maximum);
+        } else if (species == V0::Species::KaonZeroShort) {
+            KaonZeroShort_[cut_name] = Cut(minimum, maximum);
+        } else {
+            PionPair_[cut_name] = Cut(minimum, maximum);
+        }
     }
 
-    void AddCut(V0::Species species, TString name, Particle::V0::MemFn expression, Double_t min, Double_t max) {
-        Cut<Particle::V0> cut(name, expression, min, max);
-        if (species == V0::Species::Lambda) fCuts_Lambda.push_back(cut);
-        if (species == V0::Species::KaonZeroShort) fCuts_KaonZero.push_back(cut);
-        if (species == V0::Species::PionPair) fCuts_PionPair.push_back(cut);
+    void AddCut(V0::Species species, std::string cut_name, Double_t value, Cut::Limit limit_type) {
+        if (species == V0::Species::Lambda) {
+            Lambda_[cut_name] = Cut(value, limit_type);
+        } else if (species == V0::Species::KaonZeroShort) {
+            KaonZeroShort_[cut_name] = Cut(value, limit_type);
+        } else {
+            PionPair_[cut_name] = Cut(value, limit_type);
+        }
     }
 
-    Bool_t Approve(Particle::V0& candidate) {
-        std::vector<Cut<Particle::V0>> CutsCollection;
-        if (TMath::Abs(candidate.PdgCode) == 3122)
-            CutsCollection = fCuts_Lambda;
-        else if (TMath::Abs(candidate.PdgCode) == 310)
-            CutsCollection = fCuts_KaonZero;
-        else if (TMath::Abs(candidate.PdgCode) == 422)
-            CutsCollection = fCuts_PionPair;
-        return ApproveParticle(candidate, CutsCollection);
+    void AddCut(Sexaquark::Channel channel, std::string cut_name, Double_t minimum, Double_t maximum) {
+        if (channel == Sexaquark::Channel::A) {
+            ChannelA_[cut_name] = Cut(minimum, maximum);
+        } else if (channel == Sexaquark::Channel::D) {
+            ChannelD_[cut_name] = Cut(minimum, maximum);
+        } else if (channel == Sexaquark::Channel::E) {
+            ChannelE_[cut_name] = Cut(minimum, maximum);
+        } else {
+            KaonPair_[cut_name] = Cut(minimum, maximum);
+        }
     }
 
-    /* Sexaquark Candidates */
+    void AddCut(Sexaquark::Channel channel, std::string cut_name, Double_t value, Cut::Limit limit_type) {
+        if (channel == Sexaquark::Channel::A) {
+            ChannelA_[cut_name] = Cut(value, limit_type);
+        } else if (channel == Sexaquark::Channel::D) {
+            ChannelD_[cut_name] = Cut(value, limit_type);
+        } else if (channel == Sexaquark::Channel::E) {
+            ChannelE_[cut_name] = Cut(value, limit_type);
+        } else {
+            KaonPair_[cut_name] = Cut(value, limit_type);
+        }
+    }
 
-    void SetSexaquarkDefaultCuts_ChannelA();
-    void SetSexaquarkDefaultCuts_ChannelD();
-    void SetSexaquarkDefaultCuts_ChannelE();
-    void SetKaonPairDefaultCuts();
+    Cut GetCut(V0::Species species, std::string cut_name) {
+        if (species == V0::Species::Lambda) {
+            return Lambda_[cut_name];
+        } else if (species == V0::Species::KaonZeroShort) {
+            return KaonZeroShort_[cut_name];
+        } else {
+            return PionPair_[cut_name];
+        }
+    }
 
-    template <typename T>
-    void AddCut(TString name, T expression, Double_t value, Limit limit_type) {}
+    Cut GetCut(Sexaquark::Channel channel, std::string cut_name) {
+        if (channel == Sexaquark::Channel::A) {
+            return ChannelA_[cut_name];
+        } else if (channel == Sexaquark::Channel::D) {
+            return ChannelD_[cut_name];
+        } else if (channel == Sexaquark::Channel::E) {
+            return ChannelE_[cut_name];
+        } else {
+            return KaonPair_[cut_name];
+        }
+    }
 
-    template <typename T>
-    void AddCut(TString name, T expression, Double_t min, Double_t max) {}
+    inline Bool_t Check(Candidate::V0 v0, std::string cut_name, Double_t value) {
+        //
+        return GetCut(v0.GetSpecies(), cut_name).Apply(value);
+    }
+    inline Bool_t Check(Candidate::ChannelA, std::string cut_name, Double_t value) { return ChannelA_[cut_name].Apply(value); }
+    inline Bool_t Check(Candidate::ChannelD, std::string cut_name, Double_t value) { return ChannelD_[cut_name].Apply(value); }
+    inline Bool_t Check(Candidate::ChannelE, std::string cut_name, Double_t value) { return ChannelE_[cut_name].Apply(value); }
+    inline Bool_t Check(Candidate::KaonPair, std::string cut_name, Double_t value) { return KaonPair_[cut_name].Apply(value); }
 
-    Bool_t Approve(Sexaquark::ChannelA& candidate) { return ApproveParticle(candidate, fCuts_ChannelA); }
-    Bool_t Approve(Sexaquark::ChannelD& candidate) { return ApproveParticle(candidate, fCuts_ChannelD); }
-    Bool_t Approve(Sexaquark::ChannelE& candidate) { return ApproveParticle(candidate, fCuts_ChannelE); }
-    Bool_t Approve(Sexaquark::KaonPair& candidate) { return ApproveParticle(candidate, fCuts_KaonPair); }
+    Bool_t Approve(Candidate::V0 v0);
+    Bool_t Approve(Candidate::ChannelA sexaquark);
+    Bool_t Approve(Candidate::ChannelD sexaquark);
+    Bool_t Approve(Candidate::ChannelE sexaquark);
+    Bool_t Approve(Candidate::KaonPair sexaquark);
 
     void PrintAllCuts();
 
    private:
-    template <typename Particle>
-    Bool_t ApproveParticle(Particle& candidate, std::vector<Cut<Particle>>& CutsCollection) {
-        for (auto cut : CutsCollection) {
-            if (!cut.Check(candidate)) {
-                // InfoF("Particle rejected. It didn't satisfy: %s (=%f)", cut.GetInfo().Data(), cut.Evaluate(candidate));
-                return kFALSE;
-            }
-        }
-        return kTRUE;
-    }
-
-    std::vector<Cut<Particle::V0>> fCuts_Lambda;
-    std::vector<Cut<Particle::V0>> fCuts_KaonZero;
-    std::vector<Cut<Particle::V0>> fCuts_PionPair;
-
-    std::vector<Cut<Sexaquark::ChannelA>> fCuts_ChannelA;
-    std::vector<Cut<Sexaquark::ChannelD>> fCuts_ChannelD;
-    std::vector<Cut<Sexaquark::ChannelE>> fCuts_ChannelE;
-    std::vector<Cut<Sexaquark::KaonPair>> fCuts_KaonPair;
+    std::unordered_map<std::string, Cut> Lambda_;
+    std::unordered_map<std::string, Cut> KaonZeroShort_;
+    std::unordered_map<std::string, Cut> PionPair_;
+    std::unordered_map<std::string, Cut> ChannelA_;
+    std::unordered_map<std::string, Cut> ChannelD_;
+    std::unordered_map<std::string, Cut> ChannelE_;
+    std::unordered_map<std::string, Cut> KaonPair_;
 };
-
 }  // namespace Cuts
+
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_CUTS_INSPECTOR_HXX

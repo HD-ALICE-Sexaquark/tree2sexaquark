@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         /* V0s */
         ThisAnalysis->KalmanV0Finder(-2212, 211, -3122);
         // ThisAnalysis->KalmanV0Finder(-211, 2212, 3122);
-        ThisAnalysis->KalmanV0Finder(-211, 211, 310);
+        // ThisAnalysis->KalmanV0Finder(-211, 211, 310);
         // ThisAnalysis->KalmanV0Finder(-211, 211, 422);
         /* Sexaquarks */
         /*

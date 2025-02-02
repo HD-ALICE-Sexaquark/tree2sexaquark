@@ -167,10 +167,10 @@ class Manager : public Reader, public Writer {
     std::vector<Long64_t> TrackEntries_PiMinus;
     std::vector<Long64_t> TrackEntries_PiPlus;
     /* -- filled in `KalmanV0Finder()` and looped over in `KalmanSexaquarkFinder()` */
-    std::vector<Particle::V0> AntiLambdas;
-    std::vector<Particle::V0> Lambdas;
-    std::vector<Particle::V0> KaonsZeroShort;
-    std::vector<Particle::V0> PionPairs;
+    std::vector<Candidate::V0> AntiLambdas;
+    std::vector<Candidate::V0> Lambdas;
+    std::vector<Candidate::V0> KaonsZeroShort;
+    std::vector<Candidate::V0> PionPairs;
 };
 
 }  // namespace Analysis

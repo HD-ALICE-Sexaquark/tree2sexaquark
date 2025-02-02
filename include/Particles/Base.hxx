@@ -16,7 +16,7 @@
 #include "Math/Common.hxx"
 
 namespace Tree2Sexaquark {
-namespace Particle {
+namespace Candidate {
 
 /*
  * Base class for all particles
@@ -76,7 +76,7 @@ class Base {
     ROOT::Math::XYZPoint v3PV;
 };
 
-}  // namespace Particle
+}  // namespace Candidate
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_BASE_PARTICLE_HXX

@@ -6,24 +6,22 @@
 #include "Particles/Sexaquark.hxx"
 
 namespace Tree2Sexaquark {
-namespace Sexaquark {
+namespace Candidate {
 
 /*
  *
  */
-class ChannelD : public Particle::Sexaquark {
+class ChannelD : public Sexaquark {
    public:
     inline Double_t DCAKaSV() { return TMath::Abs((Double_t)kfKaon.GetDistanceFromVertex(kfThis)); };
     inline Double_t DCAKaLa() { return TMath::Abs((Double_t)kfKaon.GetDistanceFromVertex(kfLambda)); };
-
-    typedef Double_t (ChannelD::*MemFn)();
 
    private:
     ROOT::Math::PxPyPzEVector lvKaon;
     KFParticle kfKaon;
 };
 
-}  // namespace Sexaquark
+}  // namespace Candidate
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_SEXAQUARK_CHANNEL_D_HXX

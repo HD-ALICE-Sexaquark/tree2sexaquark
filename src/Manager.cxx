@@ -30,15 +30,8 @@ Bool_t Manager::OpenInputFile() {
     SetEventsTree(EventsTree);
     ConnectEventBranches();
 
-    Inspector.SetLambdaDefaultCuts();
-    Inspector.SetKaonZeroDefaultCuts();
-    Inspector.SetPionPairDefaultCuts();
-
-    Inspector.SetSexaquarkDefaultCuts_ChannelA();
-    Inspector.SetSexaquarkDefaultCuts_ChannelD();
-    Inspector.SetSexaquarkDefaultCuts_ChannelE();
-    Inspector.SetKaonPairDefaultCuts();
-
+    Inspector.InitDefaultCuts_V0();
+    Inspector.InitDefaultCuts_Sexaquark();
     Inspector.PrintAllCuts();
 
     return kTRUE;
@@ -271,28 +264,28 @@ void Manager::ProcessFindableV0s() {
 void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
     //
     Track_tt TrackNeg, TrackPos;
-    fTree_Tracks->SetBranchStatus("*", 0);
-    fTree_Tracks->SetBranchStatus("Idx", 1);
-    fTree_Tracks->SetBranchStatus("Px", 1);
-    fTree_Tracks->SetBranchStatus("Py", 1);
-    fTree_Tracks->SetBranchStatus("Pz", 1);
-    fTree_Tracks->SetBranchStatus("X", 1);
-    fTree_Tracks->SetBranchStatus("Y", 1);
-    fTree_Tracks->SetBranchStatus("Z", 1);
-    fTree_Tracks->SetBranchStatus("Charge", 1);
-    fTree_Tracks->SetBranchStatus("Alpha", 1);
-    fTree_Tracks->SetBranchStatus("Snp", 1);
-    fTree_Tracks->SetBranchStatus("Tgl", 1);
-    fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
-    fTree_Tracks->SetBranchStatus("CovMatrix", 1);
+    fTree_Tracks->SetBranchStatus("*", 1);
+    // fTree_Tracks->SetBranchStatus("Idx", 1);
+    // fTree_Tracks->SetBranchStatus("Px", 1);
+    // fTree_Tracks->SetBranchStatus("Py", 1);
+    // fTree_Tracks->SetBranchStatus("Pz", 1);
+    // fTree_Tracks->SetBranchStatus("X", 1);
+    // fTree_Tracks->SetBranchStatus("Y", 1);
+    // fTree_Tracks->SetBranchStatus("Z", 1);
+    // fTree_Tracks->SetBranchStatus("Charge", 1);
+    // fTree_Tracks->SetBranchStatus("Alpha", 1);
+    // fTree_Tracks->SetBranchStatus("Snp", 1);
+    // fTree_Tracks->SetBranchStatus("Tgl", 1);
+    // fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
+    // fTree_Tracks->SetBranchStatus("CovMatrix", 1);
     /* Declare KFParticle objects */
     KFParticle kfNeg, kfPos;
     KFParticle kfTransportedNeg, kfTransportedPos;
     /* Declare 4-momentum vectors */
     ROOT::Math::PxPyPzEVector lvNeg, lvPos;
     ROOT::Math::PxPyPzEVector lvV0;
-    /* Declare the V0 object */
-    Particle::V0 newV0;
+    /* Declare the candidate object */
+    Candidate::V0 newV0;
     newV0.SetPrimaryVertex(kfPrimaryVertex);
     /* Information from MC */
     Bool_t is_true;
@@ -341,9 +334,9 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
             lvPos = ROOT::Math::PxPyPzMVector(kfTransportedPos.Px(), kfTransportedPos.Py(), kfTransportedPos.Pz(), fPDG.GetParticle(pdgPos)->Mass());
             lvV0 = lvNeg + lvPos;
             /* Prepare V0 object */
+            newV0.SetV0Info(pdgV0, TrackNeg.Idx, TrackPos.Idx);
             newV0.SetKinematics(lvV0, lvNeg, lvPos);
             newV0.SetGeometry(kfV0, kfTransportedNeg, kfTransportedPos);
-            newV0.SetV0Info(pdgV0, TrackNeg.Idx, TrackPos.Idx);
             // if (Settings::IsMC) {
             // CollectTrueV0(pdgV0, TrackNeg.Idx, TrackPos.Idx, is_true, mc_idx_v0, mc_pdg_code, is_secondary, is_signal, reaction_id,
             //   is_hybrid);

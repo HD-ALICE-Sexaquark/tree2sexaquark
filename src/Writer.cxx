@@ -44,7 +44,7 @@ void Writer::InitV0sBranches() {
 /*
  *
  */
-void Writer::FillV0(UInt_t idxV0, Particle::V0 thisV0) {
+void Writer::FillV0(UInt_t idxV0, Candidate::V0 thisV0) {
     //
     V0.Idx = idxV0;
     V0.Idx_Neg = thisV0.EsdIdxNeg;

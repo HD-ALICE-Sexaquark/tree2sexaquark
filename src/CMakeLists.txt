@@ -64,25 +64,3 @@ target_include_directories(Logger
     ${ROOT_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
-
-# source_group(
-#   TREE ${PROJECT_SOURCE_DIR}/include
-#   FILES
-#     ${PROJECT_SOURCE_DIR}/include/Utilities/Logger.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Trees/Input.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Trees/Output.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Particles/Base.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Particles/V0.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Particles/Sexaquark.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Cuts/Default.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Cuts/Cut.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Cuts/Inspector.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Analysis/Settings.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Trees/Reader.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Trees/Writer.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Utilities/CL1.hpp
-#     ${PROJECT_SOURCE_DIR}/include/Utilities/Parser.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Math/Common.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Math/KalmanFilter.hxx
-#     ${PROJECT_SOURCE_DIR}/include/Analysis/Manager.hxx
-# )

@@ -38,7 +38,7 @@ const Double_t MaxDCAposV0 = 2.;
 const Double_t MaxArmQtOverAlpha = 0.2;
 }  // namespace Lambda
 
-namespace KaonZero {
+namespace KaonZeroShort {
 const Double_t AbsMaxEta = 0.8;
 const Double_t MinPt = 1.0;
 const Double_t MinMass = 0.475;
@@ -52,7 +52,7 @@ const Double_t MinDCAwrtPV = 4.;
 const Double_t MaxDCAbtwDau = 0.25;
 const Double_t MaxDCAnegV0 = 0.25;
 const Double_t MaxDCAposV0 = 0.25;
-}  // namespace KaonZero
+}  // namespace KaonZeroShort
 
 namespace PionPair {
 const Double_t AbsMaxEta = 0.9;

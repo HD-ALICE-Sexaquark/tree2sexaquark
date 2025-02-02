@@ -4,18 +4,13 @@
 #include "Particles/Base.hxx"
 
 namespace Tree2Sexaquark {
-namespace Sexaquark {
+namespace Candidate {
 
-/*
- *
- */
-class KaonPair : public Particle::Base {
+class KaonPair : public Base {
    public:
     inline Double_t DCAbtwKK() { return TMath::Abs((Double_t)kfKaonA.GetDistanceFromParticle(kfKaonB)); };
     inline Double_t DCAkaSV() { return TMath::Abs((Double_t)kfKaonA.GetDistanceFromVertex(kfThis)); };
     inline Double_t DCAkbSV() { return TMath::Abs((Double_t)kfKaonB.GetDistanceFromVertex(kfThis)); };
-
-    typedef Double_t (KaonPair::*MemFn)();
 
    private:
     ROOT::Math::PxPyPzEVector lvKaonA;
@@ -25,7 +20,7 @@ class KaonPair : public Particle::Base {
     KFParticle kfKaonB;
 };
 
-}  // namespace Sexaquark
+}  // namespace Candidate
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_KAON_PAIR_HXX

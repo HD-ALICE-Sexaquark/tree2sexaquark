@@ -16,23 +16,18 @@
 #include "Particles/Base.hxx"
 
 namespace Tree2Sexaquark {
+namespace Candidate {
 
-namespace V0 {
-enum class Species {
-    Lambda = 3122,
-    KaonZeroShort = 310,
-    PionPair = 422,
-};
-}  // namespace V0
-
-namespace Particle {
-
-/*
- *
- */
 class V0 : public Base {
    public:
+    enum class Species : UInt_t {
+        Lambda = 3122,
+        KaonZeroShort = 310,
+        PionPair = 422,
+    };
+
     V0() = default;
+    ~V0() = default;
     V0(Int_t pdgHypothesis, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                           //
        ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos,  //
        KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos, KFVertex kfPV)
@@ -74,9 +69,7 @@ class V0 : public Base {
           IsSignal(isSignal),
           ReactionID(reactionID),
           IsHybrid(isHybrid) {}
-    ~V0() = default;
 
-    /* --Setters */
     void SetV0Info(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos) {
         PdgCode = pdgHypothesis;
         EsdIdxNeg = esdIdxNeg;
@@ -118,7 +111,7 @@ class V0 : public Base {
     inline Double_t ArmAlpha() { return Math::ArmenterosAlpha(lvThis.Vect(), lvNeg.Vect(), lvPos.Vect()); }
     inline Double_t ArmQtOverAlpha() { return ArmQt() / TMath::Abs(ArmAlpha()); }
 
-    typedef Double_t (V0::*MemFn)();
+    V0::Species GetSpecies() { return static_cast<V0::Species>(TMath::Abs(PdgCode)); }
 
     Int_t PdgCode;  // hypothetical V0 PDG code
     UInt_t EsdIdxNeg;
@@ -141,7 +134,7 @@ class V0 : public Base {
     KFParticle kfPos;
 };
 
-}  // namespace Particle
+}  // namespace Candidate
 }  // namespace Tree2Sexaquark
 
 #endif  // T2S_V0S_HXX
