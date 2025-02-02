@@ -63,6 +63,7 @@ void Writer::FillV0(UInt_t idx_v0, Candidate::V0 new_v0) {
     V0.Pos_Px = (Float_t)new_v0.PosPx();
     V0.Pos_Py = (Float_t)new_v0.PosPy();
     V0.Pos_Pz = (Float_t)new_v0.PosPz();
+    /* True Information */
     if (Analysis::Settings::IsMC) {
         V0.Idx_True = new_v0.McIdxV0;
         V0.True_PdgCode = new_v0.McPdgCode;
@@ -99,7 +100,7 @@ void Writer::InitSexaquarkBranches_TypeA() {
         Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* -- True Information */
+        /* True Information */
         if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
@@ -150,7 +151,7 @@ void Writer::InitSexaquarkBranches_TypeD() {
         Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* -- True Information */
+        /* True Information */
         if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
@@ -198,7 +199,7 @@ void Writer::InitSexaquarkBranches_TypeE() {
         Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* -- True Information */
+        /* True Information */
         if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
@@ -251,7 +252,7 @@ void Writer::InitKaonPairBranches() {
         Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
         Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
         Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* -- True Information */
+        /* True Information */
         if (Analysis::Settings::IsMC) {
             Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
             Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);

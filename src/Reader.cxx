@@ -8,6 +8,7 @@ namespace Tree2Sexaquark {
  *
  */
 void Reader::ConnectEventBranches() {
+    //
     fTree_Events->SetBranchAddress("RunNumber", &Event.RunNumber);
     fTree_Events->SetBranchAddress("DirNumber", &Event.DirNumber);
     if (!Analysis::Settings::IsMC) fTree_Events->SetBranchAddress("DirNumberB", &Event.DirNumberB);
@@ -42,6 +43,7 @@ void Reader::ConnectEventBranches() {
  *
  */
 void Reader::ConnectInjectedBranches() {
+    //
     fTree_Injected->SetBranchAddress("ReactionID", &Injected.ReactionID);
     fTree_Injected->SetBranchAddress("Px", &Injected.Px);
     fTree_Injected->SetBranchAddress("Py", &Injected.Py);
@@ -55,6 +57,7 @@ void Reader::ConnectInjectedBranches() {
  *
  */
 void Reader::ConnectMCBranches() {
+    //
     fTree_MC->SetBranchAddress("Idx", &MC.Idx);
     fTree_MC->SetBranchAddress("PdgCode", &MC.PdgCode);
     fTree_MC->SetBranchAddress("Idx_Mother", &MC.Idx_Mother);
@@ -78,6 +81,7 @@ void Reader::ConnectMCBranches() {
  *
  */
 void Reader::ConnectTracksBranches() {
+    //
     fTree_Tracks->SetBranchAddress("Idx", &Track.Idx);
     fTree_Tracks->SetBranchAddress("Px", &Track.Px);
     fTree_Tracks->SetBranchAddress("Py", &Track.Py);

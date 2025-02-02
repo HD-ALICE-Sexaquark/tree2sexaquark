@@ -19,7 +19,7 @@ class Reader {
         if (fTree_Events) fTree_Events->ResetBranchAddresses();
     }
     inline virtual Long64_t GetN_Events() { return fTree_Events->GetEntries(); }
-    inline Int_t ReadEvent(Long64_t eventEntry) { return fTree_Events->GetEntry(eventEntry); }
+    inline Int_t ReadEvent(Long64_t event_entry) { return fTree_Events->GetEntry(event_entry); }
 
     void SetInjectedTree(TTree* tree) { fTree_Injected = tree; }
     void ConnectInjectedBranches();
@@ -27,7 +27,7 @@ class Reader {
         if (fTree_Injected) fTree_Injected->ResetBranchAddresses();
     }
     inline Long64_t GetN_Injected() { return fTree_Injected->GetEntries(); }
-    inline Int_t ReadInjected(Long64_t reactionEntry) { return fTree_Injected->GetEntry(reactionEntry); }
+    inline Int_t ReadInjected(Long64_t reaction_entry) { return fTree_Injected->GetEntry(reaction_entry); }
 
     void SetMCTree(TTree* tree) { fTree_MC = tree; }
     void ConnectMCBranches();
@@ -35,7 +35,7 @@ class Reader {
         if (fTree_MC) fTree_MC->ResetBranchAddresses();
     }
     inline Long64_t GetN_MCParticles() { return fTree_MC->GetEntries(); }
-    inline Int_t ReadMCParticle(Long64_t mcEntry) { return fTree_MC->GetEntry(mcEntry); }
+    inline Int_t ReadMCParticle(Long64_t mc_entry) { return fTree_MC->GetEntry(mc_entry); }
 
     void SetTracksTree(TTree* tree) { fTree_Tracks = tree; }
     void ConnectTracksBranches();
@@ -43,7 +43,7 @@ class Reader {
         if (fTree_Tracks) fTree_Tracks->ResetBranchAddresses();
     }
     inline Long64_t GetN_Tracks() { return fTree_Tracks->GetEntries(); }
-    inline Int_t ReadTrack(Long64_t trackEntry) { return fTree_Tracks->GetEntry(trackEntry); }
+    inline Int_t ReadTrack(Long64_t track_entry) { return fTree_Tracks->GetEntry(track_entry); }
 
    protected:
     Event_tt Event;

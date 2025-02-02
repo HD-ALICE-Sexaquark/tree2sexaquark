@@ -10,50 +10,50 @@ namespace Math {
 /*
  * Calculate the cosine of the pointing angle of a particle with momentum Px,Py,Pz and vertex X,Y,Z w.r.t. to a reference point
  */
-Double_t CosinePointingAngle(ROOT::Math::XYZVector momV0, ROOT::Math::XYZPoint posV0, ROOT::Math::XYZPoint posRef) {
+Double_t CosinePointingAngle(ROOT::Math::XYZVector mom_v0, ROOT::Math::XYZPoint pos_v0, ROOT::Math::XYZPoint pos_ref) {
     //
-    return TMath::Cos(ROOT::Math::VectorUtil::Angle(momV0, posV0 - posRef));
+    return TMath::Cos(ROOT::Math::VectorUtil::Angle(mom_v0, pos_v0 - pos_ref));
 }
 
 /*
  * Overload of `CosinePointingAngle(...)`, using Px, Py, Pz instead of the particles' 4-momentum.
  */
-Double_t CosinePointingAngle(Double_t V0_Px, Double_t V0_Py, Double_t V0_Pz, Double_t V0_Xv, Double_t V0_Yv, Double_t V0_Zv, Double_t Ref_Xv,
-                             Double_t Ref_Yv, Double_t Ref_Zv) {
+Double_t CosinePointingAngle(Double_t v0_px, Double_t v0_py, Double_t v0_pz, Double_t v0_x, Double_t v0_y, Double_t v0_z, Double_t ref_x,
+                             Double_t ref_y, Double_t ref_z) {
     //
-    ROOT::Math::XYZVector momV0(V0_Px, V0_Py, V0_Pz);
-    ROOT::Math::XYZPoint posV0(V0_Xv, V0_Yv, V0_Zv);
-    ROOT::Math::XYZPoint posRef(Ref_Xv, Ref_Yv, Ref_Zv);
-    return CosinePointingAngle(momV0, posV0, posRef);
+    ROOT::Math::XYZVector MomV0(v0_px, v0_py, v0_pz);
+    ROOT::Math::XYZPoint PosV0(v0_x, v0_y, v0_z);
+    ROOT::Math::XYZPoint PosRef(ref_x, ref_y, ref_z);
+    return CosinePointingAngle(MomV0, PosV0, PosRef);
 }
 
 /*
  * Calculate Armenteros-Podolanski qT
  * Based on https://github.com/alisw/AliRoot (STEER/ESD/AliESDv0::PtArmV0())
  */
-Double_t ArmenterosQt(ROOT::Math::XYZVector momV0, ROOT::Math::XYZVector momDau) {
+Double_t ArmenterosQt(ROOT::Math::XYZVector mom_v0, ROOT::Math::XYZVector mom_dau) {
     //
-    return ROOT::Math::VectorUtil::Perp(momV0, momDau);
+    return ROOT::Math::VectorUtil::Perp(mom_v0, mom_dau);
 }
 
 /*
  * Overload of `ArmenterosQt(...)`
  */
-Double_t ArmenterosQt(Double_t V0_Px, Double_t V0_Py, Double_t V0_Pz, Double_t Dau_Px, Double_t Dau_Py, Double_t Dau_Pz) {
+Double_t ArmenterosQt(Double_t v0_px, Double_t v0_py, Double_t v0_pz, Double_t dau_px, Double_t dau_py, Double_t dau_pz) {
     //
-    ROOT::Math::XYZVector momV0(V0_Px, V0_Py, V0_Pz);
-    ROOT::Math::XYZVector momDau(Dau_Px, Dau_Py, Dau_Pz);
-    return ArmenterosQt(momV0, momDau);
+    ROOT::Math::XYZVector MomV0(v0_px, v0_py, v0_pz);
+    ROOT::Math::XYZVector MomDau(dau_px, dau_py, dau_pz);
+    return ArmenterosQt(MomV0, MomDau);
 }
 
 /*
  * Calculate Armenteros-Podolanski alpha
  * Based on https://github.com/alisw/AliRoot (STEER/ESD/AliESDv0::AlphaV0())
  */
-Double_t ArmenterosAlpha(ROOT::Math::XYZVector momV0, ROOT::Math::XYZVector momNeg, ROOT::Math::XYZVector momPos) {
+Double_t ArmenterosAlpha(ROOT::Math::XYZVector mom_v0, ROOT::Math::XYZVector mom_neg, ROOT::Math::XYZVector mom_pos) {
     //
-    Double_t lQlNeg = momNeg.Dot(momV0) / momV0.R();
-    Double_t lQlPos = momPos.Dot(momV0) / momV0.R();
+    Double_t lQlNeg = mom_neg.Dot(mom_v0) / mom_v0.R();
+    Double_t lQlPos = mom_pos.Dot(mom_v0) / mom_v0.R();
     if (TMath::Abs(lQlPos + lQlNeg) < 1E-6) return 2.;  // protection
     return (lQlPos - lQlNeg) / (lQlPos + lQlNeg);
 }
@@ -61,35 +61,35 @@ Double_t ArmenterosAlpha(ROOT::Math::XYZVector momV0, ROOT::Math::XYZVector momN
 /*
  * Overload of `ArmenterosAlpha()`
  */
-Double_t ArmenterosAlpha(Double_t V0_Px, Double_t V0_Py, Double_t V0_Pz, Double_t Neg_Px, Double_t Neg_Py, Double_t Neg_Pz, Double_t Pos_Px,
-                         Double_t Pos_Py, Double_t Pos_Pz) {
+Double_t ArmenterosAlpha(Double_t v0_px, Double_t v0_py, Double_t v0_pz, Double_t neg_px, Double_t neg_py, Double_t neg_pz, Double_t pos_px,
+                         Double_t pos_py, Double_t pos_pz) {
     //
-    ROOT::Math::XYZVector momV0(V0_Px, V0_Py, V0_Pz);
-    ROOT::Math::XYZVector momNeg(Neg_Px, Neg_Py, Neg_Pz);
-    ROOT::Math::XYZVector momPos(Pos_Px, Pos_Py, Pos_Pz);
-    return ArmenterosAlpha(momV0, momNeg, momPos);
+    ROOT::Math::XYZVector MomV0(v0_px, v0_py, v0_pz);
+    ROOT::Math::XYZVector MomNeg(neg_px, neg_py, neg_pz);
+    ROOT::Math::XYZVector MomPos(pos_px, pos_py, pos_pz);
+    return ArmenterosAlpha(MomV0, MomNeg, MomPos);
 }
 
 /*
  * Find the distance of closest approach to the Primary Vertex, after backtracking a V0.
  * This function stores the point of closest approach, and returns its distance to the PV.
  */
-Double_t LinePointDCA(ROOT::Math::XYZVector momV0, ROOT::Math::XYZPoint posV0, ROOT::Math::XYZPoint posRef) {
+Double_t LinePointDCA(ROOT::Math::XYZVector mom_v0, ROOT::Math::XYZPoint pos_v0, ROOT::Math::XYZPoint pos_ref) {
     //
-    ROOT::Math::XYZVector CrossProduct = (posRef - posV0).Cross(momV0);
-    return CrossProduct.R() / momV0.R();
+    ROOT::Math::XYZVector CrossProduct = (pos_ref - pos_v0).Cross(mom_v0);
+    return CrossProduct.R() / mom_v0.R();
 }
 
 /*
  * Overload of `LinePointDCA()`
  */
-Double_t LinePointDCA(Double_t V0_Px, Double_t V0_Py, Double_t V0_Pz, Double_t V0_Xv, Double_t V0_Yv, Double_t V0_Zv, Double_t Ref_Xv,
-                      Double_t Ref_Yv, Double_t Ref_Zv) {
+Double_t LinePointDCA(Double_t v0_px, Double_t v0_py, Double_t v0_pz, Double_t v0_x, Double_t v0_y, Double_t v0_z, Double_t ref_x, Double_t ref_y,
+                      Double_t ref_z) {
     //
-    ROOT::Math::XYZVector momV0(V0_Px, V0_Py, V0_Pz);
-    ROOT::Math::XYZPoint posV0(V0_Xv, V0_Yv, V0_Zv);
-    ROOT::Math::XYZPoint posRef(Ref_Xv, Ref_Yv, Ref_Zv);
-    return LinePointDCA(momV0, posV0, posRef);
+    ROOT::Math::XYZVector MomV0(v0_px, v0_py, v0_pz);
+    ROOT::Math::XYZPoint PosV0(v0_x, v0_y, v0_z);
+    ROOT::Math::XYZPoint PosRef(ref_x, ref_y, ref_z);
+    return LinePointDCA(MomV0, PosV0, PosRef);
 }
 
 }  // namespace Math

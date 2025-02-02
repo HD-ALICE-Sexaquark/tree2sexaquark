@@ -45,12 +45,12 @@ class Logger {
 };
 
 /* Source: https://stackoverflow.com/a/15775519 */
-inline const char* MethodName(const std::string& prettyFunction) {
+inline const char* MethodName(const std::string& pretty_function) {
     static std::string output;
-    size_t colons = prettyFunction.find("::") != std::string::npos ? prettyFunction.rfind("::") : prettyFunction.size();
-    size_t begin = prettyFunction.substr(0, colons).find(" ") + 1;
-    size_t end = prettyFunction.rfind("(") - begin;
-    output = prettyFunction.substr(begin, end) + "()";
+    size_t colons = pretty_function.find("::") != std::string::npos ? pretty_function.rfind("::") : pretty_function.size();
+    size_t begin = pretty_function.substr(0, colons).find(" ") + 1;
+    size_t end = pretty_function.rfind("(") - begin;
+    output = pretty_function.substr(begin, end) + "()";
     return output.c_str();
 }
 #define __METHOD_NAME__ MethodName(__PRETTY_FUNCTION__)

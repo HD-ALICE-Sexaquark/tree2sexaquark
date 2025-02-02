@@ -13,8 +13,8 @@ namespace Tree2Sexaquark {
 namespace Math {
 
 KFParticle CreateKFParticle(Track_tt track, Double_t mass);
-KFVertex CreateKFVertex(Float_t* XYZ, Float_t* CovarianceMatrix);
-KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t massThis, Int_t chargeThis);
+KFVertex CreateKFVertex(Float_t* xyz, Float_t* cov_matrix);
+KFParticle TransportKFParticle(KFParticle kf_this, KFParticle kf_other, Double_t mass_this, Int_t charge_this);
 
 /*
 class KFParticleMother : public KFParticle {

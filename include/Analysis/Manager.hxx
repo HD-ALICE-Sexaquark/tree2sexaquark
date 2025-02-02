@@ -71,17 +71,17 @@ class Manager : public Reader, public Writer {
     inline Bool_t MC_IsSignal() { return MC.Generator == 2; }
     inline Bool_t MC_IsSecondary() { return MC.IsSecFromMat || MC.IsSecFromWeak || MC_IsSignal(); }
     /* -- translate between MC entries and indices */
-    inline Long64_t GetMcEntry(UInt_t mcIdx) { return getMcEntry_fromMcIdx[mcIdx]; }
-    inline UInt_t GetMcIdx(Long64_t mcEntry) { return getMcIdx_FromMcEntry[mcEntry]; }
+    inline Long64_t GetMcEntry(UInt_t mc_idx) { return getMcEntry_fromMcIdx[mc_idx]; }
+    inline UInt_t GetMcIdx(Long64_t mc_entry) { return getMcIdx_FromMcEntry[mc_entry]; }
     /* -- necessary for V0s */
-    inline Long64_t GetMcEntryNeg(Long64_t mcEntryMother) {
-        UInt_t mcIdxMother = GetMcIdx(mcEntryMother);
+    inline Long64_t GetMcEntryNeg(Long64_t mc_entry_mother) {
+        UInt_t mcIdxMother = GetMcIdx(mc_entry_mother);
         if (getMcIdxNeg_fromMcIdx.find(mcIdxMother) == getMcIdxNeg_fromMcIdx.end()) return -1;
         UInt_t mcIdxNeg = getMcIdxNeg_fromMcIdx[mcIdxMother];
         return GetMcEntry(mcIdxNeg);
     }
-    inline Long64_t GetMcEntryPos(Long64_t mcEntryMother) {
-        UInt_t mcIdxMother = GetMcIdx(mcEntryMother);
+    inline Long64_t GetMcEntryPos(Long64_t mc_entry_mother) {
+        UInt_t mcIdxMother = GetMcIdx(mc_entry_mother);
         if (getMcIdxPos_fromMcIdx.find(mcIdxMother) == getMcIdxPos_fromMcIdx.end()) return -1;
         UInt_t mcIdxPos = getMcIdxPos_fromMcIdx[mcIdxMother];
         return GetMcEntry(mcIdxPos);
@@ -90,38 +90,38 @@ class Manager : public Reader, public Writer {
     /* Tracks */
     void ProcessTracks();
     /* -- translate between Track entries and ESD indices */
-    inline Long64_t GetTrackEntry(UInt_t esdIdx) { return getTrackEntry_fromEsdIdx[esdIdx]; }
-    inline UInt_t GetEsdIdx(Long64_t trackEntry) { return getEsdIdx_fromTrackEntry[trackEntry]; }
+    inline Long64_t GetTrackEntry(UInt_t esd_idx) { return getTrackEntry_fromEsdIdx[esd_idx]; }
+    inline UInt_t GetEsdIdx(Long64_t track_entry) { return getEsdIdx_fromTrackEntry[track_entry]; }
     /* -- link between MC and Tracks */
-    inline Long64_t GetTrackEntryFromMcEntry(Long64_t mcEntry) {
-        UInt_t mcIdx = GetMcIdx(mcEntry);
+    inline Long64_t GetTrackEntryFromMcEntry(Long64_t mc_entry) {
+        UInt_t mcIdx = GetMcIdx(mc_entry);
         if (getEsdIdx_fromMcIdx.find(mcIdx) == getEsdIdx_fromMcIdx.end()) return -1;
         return GetTrackEntry(getEsdIdx_fromMcIdx[mcIdx]);
     }
-    inline Long64_t GetMcEntryFromTrackEntry(Long64_t trackEntry) {
-        UInt_t esdIdx = GetEsdIdx(trackEntry);
+    inline Long64_t GetMcEntryFromTrackEntry(Long64_t track_entry) {
+        UInt_t esdIdx = GetEsdIdx(track_entry);
         if (getMcIdx_fromEsdIdx.find(esdIdx) == getMcIdx_fromEsdIdx.end()) return -1;
         return GetMcEntry(getMcIdx_fromEsdIdx[esdIdx]);
     }
     /*  */
-    inline Bool_t CopyTrack(Long64_t trackEntry, Track_tt& track) {
-        if (!ReadTrack(trackEntry)) return kFALSE;
+    inline Bool_t CopyTrack(Long64_t track_entry, Track_tt& track) {
+        if (!ReadTrack(track_entry)) return kFALSE;
         track = Track;
         return kTRUE;
     }
 
     /* V0s */
     void ProcessFindableV0s();
-    void KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0);
-    void CollectTrueV0(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos, Bool_t& isTrue, Int_t& mcIdxV0, Int_t& mcPdgCode, Bool_t& isSecondary,
-                       Bool_t& isSignal, Int_t& reactionID, Bool_t& isHybrid);
+    void KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0);
+    void CollectTrueV0(Int_t pdg_hypothesis, UInt_t esd_idx_neg, UInt_t esd_idx_pos, Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code,
+                       Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id, Bool_t& is_hybrid);
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
-    void KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts);
-    void KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts);
-    void KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts);
-    void KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts);
+    void KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products);
+    void KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdg_reaction_products);
+    void KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdg_reaction_products);
+    void KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdg_reaction_products);
 
     /* Cuts */
     Cuts::Inspector Inspector;

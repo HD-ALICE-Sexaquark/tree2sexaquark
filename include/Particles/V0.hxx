@@ -3,14 +3,12 @@
 
 #include "TMath.h"
 
-#include "Math/Point3D.h"
 #include "Math/Vector4D.h"
 
 #ifndef HomogeneousField
 #define HomogeneousField  // homogeneous field in z direction, required by KFParticle
 #endif
 #include "KFParticle.h"
-#include "KFVertex.h"
 
 #include "Math/Common.hxx"
 #include "Particles/Base.hxx"
@@ -26,10 +24,10 @@ class V0 : public Base {
         PionPair = 422,
     };
 
-    void SetV0Info(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos) {
-        PdgCode = pdgHypothesis;
-        EsdIdxNeg = esdIdxNeg;
-        EsdIdxPos = esdIdxPos;
+    void SetV0Info(Int_t pdg_hypothesis, UInt_t esd_idx_neg, UInt_t esd_idx_pos) {
+        PdgCode = pdg_hypothesis;
+        EsdIdxNeg = esd_idx_neg;
+        EsdIdxPos = esd_idx_pos;
     }
     void SetKinematics(ROOT::Math::PxPyPzEVector lv_v0, ROOT::Math::PxPyPzEVector lv_neg, ROOT::Math::PxPyPzEVector lv_pos) {
         lvThis = lv_v0;
@@ -42,14 +40,14 @@ class V0 : public Base {
         kfNeg = kf_neg;
         kfPos = kf_pos;
     }
-    void SetTrueInfo(Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t reactionID, Bool_t isHybrid) {
-        IsTrue = isTrue;
-        McIdxV0 = mcIdxV0;
-        McPdgCode = mcPdgCode;
-        IsSecondary = isSecondary;
-        IsSignal = isSignal;
-        ReactionID = reactionID;
-        IsHybrid = isHybrid;
+    void SetTrueInfo(Bool_t is_true, Int_t mc_idx_v0, Int_t mc_pdg_code, Bool_t is_secondary, Bool_t is_signal, Int_t reaction_id, Bool_t is_hybrid) {
+        IsTrue = is_true;
+        McIdxV0 = mc_idx_v0;
+        McPdgCode = mc_pdg_code;
+        IsSecondary = is_secondary;
+        IsSignal = is_signal;
+        ReactionID = reaction_id;
+        IsHybrid = is_hybrid;
     }
 
     inline Double_t NegPx() { return lvNeg.Px(); }

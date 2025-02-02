@@ -73,33 +73,30 @@ KFParticle CreateKFParticle(Track_tt track, Double_t mass) {
  * - Arguments: XYZ[3], CovarianceMatrix[6]
  * (Copied from (https://github.com/alisw/AliPhysics)/PWGLF/.../AliAnalysisTaskDoubleHypNucTree.cxx`)
  */
-KFVertex CreateKFVertex(Float_t* XYZ, Float_t* CovarianceMatrix) {
-
+KFVertex CreateKFVertex(Float_t* xyz, Float_t* cov_matrix) {
+    //
     KFPVertex kfpVtx;
-    kfpVtx.SetXYZ(XYZ);
-    kfpVtx.SetCovarianceMatrix(CovarianceMatrix);
+    kfpVtx.SetXYZ(xyz);
+    kfpVtx.SetCovarianceMatrix(cov_matrix);
 
     KFVertex KFVtx(kfpVtx);
-
     return KFVtx;
 }
 
 /*
  * Transport a KFParticle to the point of closest approach w.r.t. another KFParticle.
  */
-KFParticle TransportKFParticle(KFParticle kfThis, KFParticle kfOther, Double_t massThis, Int_t chargeThis) {
-
+KFParticle TransportKFParticle(KFParticle kf_this, KFParticle kf_other, Double_t mass_this, Int_t charge_this) {
+    //
     Float_t dS[2];
     Float_t dsdr[4][6];
-    kfThis.GetDStoParticle(kfOther, dS, dsdr);
-    // GetDStoParticleBz(fMagneticField, kfThis, kfOther, dS, dsdr); // TEST
+    kf_this.GetDStoParticle(kf_other, dS, dsdr);
 
     Float_t mP[8], mC[36];
-    kfThis.Transport(dS[0], dsdr[0], mP, mC);
+    kf_this.Transport(dS[0], dsdr[0], mP, mC);
 
-    Float_t mM = massThis;
-    Float_t mQ = chargeThis;  // only valid for charged particles with Q = +/- 1
-
+    Float_t mM = mass_this;
+    Float_t mQ = charge_this;  // only valid for charged particles with Q = +/- 1
     KFParticle kfTransported;
     kfTransported.Create(mP, mC, mQ, mM);
 

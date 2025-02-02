@@ -261,23 +261,23 @@ void Manager::ProcessFindableV0s() {
 /*
  * Find all V0s via Kalman Filter.
  */
-void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
+void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
     //
     Track_tt TrackNeg, TrackPos;
-    fTree_Tracks->SetBranchStatus("*", 1);
-    // fTree_Tracks->SetBranchStatus("Idx", 1);
-    // fTree_Tracks->SetBranchStatus("Px", 1);
-    // fTree_Tracks->SetBranchStatus("Py", 1);
-    // fTree_Tracks->SetBranchStatus("Pz", 1);
-    // fTree_Tracks->SetBranchStatus("X", 1);
-    // fTree_Tracks->SetBranchStatus("Y", 1);
-    // fTree_Tracks->SetBranchStatus("Z", 1);
-    // fTree_Tracks->SetBranchStatus("Charge", 1);
-    // fTree_Tracks->SetBranchStatus("Alpha", 1);
-    // fTree_Tracks->SetBranchStatus("Snp", 1);
-    // fTree_Tracks->SetBranchStatus("Tgl", 1);
-    // fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
-    // fTree_Tracks->SetBranchStatus("CovMatrix", 1);
+    fTree_Tracks->SetBranchStatus("*", 0);
+    fTree_Tracks->SetBranchStatus("Idx", 1);
+    fTree_Tracks->SetBranchStatus("Px", 1);
+    fTree_Tracks->SetBranchStatus("Py", 1);
+    fTree_Tracks->SetBranchStatus("Pz", 1);
+    fTree_Tracks->SetBranchStatus("X", 1);
+    fTree_Tracks->SetBranchStatus("Y", 1);
+    fTree_Tracks->SetBranchStatus("Z", 1);
+    fTree_Tracks->SetBranchStatus("Charge", 1);
+    fTree_Tracks->SetBranchStatus("Alpha", 1);
+    fTree_Tracks->SetBranchStatus("Snp", 1);
+    fTree_Tracks->SetBranchStatus("Tgl", 1);
+    fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
+    fTree_Tracks->SetBranchStatus("CovMatrix", 1);
     /* Declare KFParticle objects */
     KFParticle kfNeg, kfPos;
     KFParticle kfTransportedNeg, kfTransportedPos;
@@ -298,10 +298,10 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
     /* Choose tracks species to loop over */
     std::vector<Long64_t> TrackEntries_Neg;
     std::vector<Long64_t> TrackEntries_Pos;
-    if (pdgV0 == -3122) {
+    if (pdg_v0 == -3122) {
         TrackEntries_Neg = TrackEntries_AntiProton;
         TrackEntries_Pos = TrackEntries_PiPlus;
-    } else if (pdgV0 == 3122) {
+    } else if (pdg_v0 == 3122) {
         TrackEntries_Neg = TrackEntries_PiMinus;
         TrackEntries_Pos = TrackEntries_Proton;
     } else {
@@ -318,24 +318,24 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
             if (!CopyTrack(Neg_Entry, TrackNeg)) continue;
             if (!CopyTrack(Pos_Entry, TrackPos)) continue;
             /* Kalman Filter */
-            kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdgNeg)->Mass());
-            kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdgPos)->Mass());
+            kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdg_neg)->Mass());
+            kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdg_pos)->Mass());
             KFParticle kfV0;
             kfV0.AddDaughter(kfNeg);
             kfV0.AddDaughter(kfPos);
             /* Transport V0 and daughters */
             /* PENDING: study further */
             kfV0.TransportToDecayVertex();
-            kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdgNeg)->Mass(),  //
+            kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdg_neg)->Mass(),  //
                                                          (Int_t)TrackNeg.Charge);
-            kfTransportedPos = Math::TransportKFParticle(kfPos, kfNeg, fPDG.GetParticle(pdgPos)->Mass(),  //
+            kfTransportedPos = Math::TransportKFParticle(kfPos, kfNeg, fPDG.GetParticle(pdg_pos)->Mass(),  //
                                                          (Int_t)TrackPos.Charge);
             /* Reconstruct V0 */
-            lvNeg = ROOT::Math::PxPyPzMVector(kfTransportedNeg.Px(), kfTransportedNeg.Py(), kfTransportedNeg.Pz(), fPDG.GetParticle(pdgNeg)->Mass());
-            lvPos = ROOT::Math::PxPyPzMVector(kfTransportedPos.Px(), kfTransportedPos.Py(), kfTransportedPos.Pz(), fPDG.GetParticle(pdgPos)->Mass());
+            lvNeg = ROOT::Math::PxPyPzMVector(kfTransportedNeg.Px(), kfTransportedNeg.Py(), kfTransportedNeg.Pz(), fPDG.GetParticle(pdg_neg)->Mass());
+            lvPos = ROOT::Math::PxPyPzMVector(kfTransportedPos.Px(), kfTransportedPos.Py(), kfTransportedPos.Pz(), fPDG.GetParticle(pdg_pos)->Mass());
             lvV0 = lvNeg + lvPos;
             /* Prepare V0 object */
-            newV0.SetV0Info(pdgV0, TrackNeg.Idx, TrackPos.Idx);
+            newV0.SetV0Info(pdg_v0, TrackNeg.Idx, TrackPos.Idx);
             newV0.SetKinematics(lvV0, lvNeg, lvPos);
             newV0.SetGeometry(kfV0, kfTransportedNeg, kfTransportedPos);
             // if (Settings::IsMC) {
@@ -361,32 +361,32 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
                 newV0.Eta(), newV0.Pt(), newV0.Radius(), newV0.DistFromPV(), newV0.CPAwrtPV(), newV0.DCAwrtPV(),  //
                 newV0.DCAbtwDau(), newV0.DCAnegV0(), newV0.DCAposV0(), newV0.ArmQt(), newV0.ArmAlpha(), newV0.ArmQtOverAlpha());
             */
-            if (pdgV0 == -3122)
+            if (pdg_v0 == -3122)
                 AntiLambdas.push_back(newV0);
-            else if (pdgV0 == 3122)
+            else if (pdg_v0 == 3122)
                 Lambdas.push_back(newV0);
-            else if (pdgV0 == 310)
+            else if (pdg_v0 == 310)
                 KaonsZeroShort.push_back(newV0);
-            else if (pdgV0 == 422)
+            else if (pdg_v0 == 422)
                 PionPairs.push_back(newV0);
             FillV0(1, newV0);
         }  // end of loop over pos. tracks
     }      // end of loop over neg. tracks
-    if (pdgV0 == -3122)
+    if (pdg_v0 == -3122)
         InfoF("N Found AntiLambdas: %lu", AntiLambdas.size());
-    else if (pdgV0 == 3122)
+    else if (pdg_v0 == 3122)
         InfoF("N Found Lambdas: %lu", Lambdas.size());
-    else if (pdgV0 == 310)
+    else if (pdg_v0 == 310)
         InfoF("N Found KaonsZeroShort: %lu", KaonsZeroShort.size());
-    else if (pdgV0 == 422)
+    else if (pdg_v0 == 422)
         InfoF("N Found PionPairs: %lu", PionPairs.size());
 }
 
 /*
  *
  */
-void Manager::CollectTrueV0(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos, Bool_t& isTrue, Int_t& mcIdxV0, Int_t& mcPdgCode,
-                            Bool_t& isSecondary, Bool_t& isSignal, Int_t& reactionID, Bool_t& isHybrid) {
+void Manager::CollectTrueV0(Int_t pdg_hypothesis, UInt_t esd_idx_neg, UInt_t esd_idx_pos, Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code,
+                            Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id, Bool_t& is_hybrid) {
     // /* -- By default */
     // isTrue = kFALSE;
     // mcIdxV0 = -1;
@@ -494,15 +494,15 @@ void Manager::ProcessFindableSexaquarks() {
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
     //
-    if (pdgReactionProducts.size() > 2) {
-        KalmanSexaquarkFinder_TypeDE(pdgReactionProducts);
+    if (pdg_reaction_products.size() > 2) {
+        KalmanSexaquarkFinder_TypeDE(pdg_reaction_products);
     } else {
-        if (TMath::Abs(pdgStruckNucleon) == 2112) {
-            KalmanSexaquarkFinder_TypeA(pdgReactionProducts);
+        if (TMath::Abs(pdg_struck_nucleon) == 2112) {
+            KalmanSexaquarkFinder_TypeA(pdg_reaction_products);
         } else {
-            KalmanSexaquarkFinder_TypeH(pdgReactionProducts);
+            KalmanSexaquarkFinder_TypeH(pdg_reaction_products);
         }
     }
 }
@@ -510,21 +510,21 @@ void Manager::KalmanSexaquarkFinder(Int_t pdgStruckNucleon, std::vector<Int_t> p
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdg_reaction_products) {
     //
 }
 
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdg_reaction_products) {
     //
 }
 
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdgReactionProducts) {
+void Manager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdg_reaction_products) {
     //
 }
 
