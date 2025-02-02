@@ -75,6 +75,11 @@ struct MC_tt {
     Bool_t IsSecFromMat;   //
     Bool_t IsSecFromWeak;  //
     Int_t ReactionID;      //
+    inline Bool_t HasMother() { return Idx_Mother != -1; }
+    inline Bool_t IsSignal() { return Generator == 2; }
+    inline Bool_t IsFirstGenSignal() { return IsSignal() && !HasMother(); }
+    inline Bool_t IsFinalStateSignal() { return Generator == 2 && HasMother(); }
+    inline Bool_t IsSecondary() { return IsSecFromMat || IsSecFromWeak || IsSignal(); }
 };
 
 /*

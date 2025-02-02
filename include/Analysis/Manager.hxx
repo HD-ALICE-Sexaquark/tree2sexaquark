@@ -67,9 +67,6 @@ class Manager : public Reader, public Writer {
 
     /* MC Particles */
     void ProcessMCParticles();
-    inline Bool_t MC_IsFinalStateSignal() { return MC.Generator == 2 && MC.Idx_Ancestor != -1; }
-    inline Bool_t MC_IsSignal() { return MC.Generator == 2; }
-    inline Bool_t MC_IsSecondary() { return MC.IsSecFromMat || MC.IsSecFromWeak || MC_IsSignal(); }
     /* -- translate between MC entries and indices */
     inline Long64_t GetMcEntry(UInt_t mc_idx) { return getMcEntry_fromMcIdx[mc_idx]; }
     inline UInt_t GetMcIdx(Long64_t mc_entry) { return getMcIdx_FromMcEntry[mc_entry]; }
@@ -85,6 +82,12 @@ class Manager : public Reader, public Writer {
         if (getMcIdxPos_fromMcIdx.find(mcIdxMother) == getMcIdxPos_fromMcIdx.end()) return -1;
         UInt_t mcIdxPos = getMcIdxPos_fromMcIdx[mcIdxMother];
         return GetMcEntry(mcIdxPos);
+    }
+    /*  */
+    inline Bool_t CopyMCParticle(Long64_t mc_entry, MC_tt& this_mc) {
+        if (!ReadMCParticle(mc_entry)) return kFALSE;
+        this_mc = MC;
+        return kTRUE;
     }
 
     /* Tracks */
@@ -104,17 +107,18 @@ class Manager : public Reader, public Writer {
         return GetMcEntry(getMcIdx_fromEsdIdx[esdIdx]);
     }
     /*  */
-    inline Bool_t CopyTrack(Long64_t track_entry, Track_tt& track) {
+    inline Bool_t CopyTrack(Long64_t track_entry, Track_tt& this_track) {
         if (!ReadTrack(track_entry)) return kFALSE;
-        track = Track;
+        this_track = Track;
         return kTRUE;
     }
 
     /* V0s */
     void ProcessFindableV0s();
     void KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0);
-    void CollectTrueV0(Int_t pdg_hypothesis, UInt_t esd_idx_neg, UInt_t esd_idx_pos, Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code,
-                       Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id, Bool_t& is_hybrid);
+    void CollectTrueInfo_V0(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_hypothesis, Long64_t neg_entry, Long64_t pos_entry,  //
+                            Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code, Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id,
+                            Bool_t& is_hybrid);
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
