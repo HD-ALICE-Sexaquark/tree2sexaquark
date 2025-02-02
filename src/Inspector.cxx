@@ -14,24 +14,24 @@ void Inspector::InitDefaultCuts_V0() {
     AddCut(V0::Species::Lambda, "PtCut", Default::Lambda::MinPt, Cut::Limit::Minimum);
     AddCut(V0::Species::Lambda, "MassRange", Default::Lambda::MinMass, Default::Lambda::MaxMass);
     AddCut(V0::Species::Lambda, "RadiusCut", Default::Lambda::MinRadius, Cut::Limit::Minimum);
-    // AddCut(V0::Species::Lambda, "DistFromPVCut", Default::Lambda::MinDistFromPV, Cut::Limit::Minimum);
-    // AddCut(V0::Species::Lambda, "CPAwrtPVCut", Default::Lambda::MinCPAwrtPV, Default::Lambda::MaxCPAwrtPV);
-    // AddCut(V0::Species::Lambda, "DCAwrtPVCut", Default::Lambda::MinDCAwrtPV, Cut::Limit::Minimum);
-    // AddCut(V0::Species::Lambda, "DCAbtwDauCut", Default::Lambda::MaxDCAbtwDau, Cut::Limit::Maximum);
-    // AddCut(V0::Species::Lambda, "DCAnegV0Cut", Default::Lambda::MaxDCAnegV0, Cut::Limit::Maximum);
-    // AddCut(V0::Species::Lambda, "DCAposV0Cut", Default::Lambda::MaxDCAposV0, Cut::Limit::Maximum);
+    AddCut(V0::Species::Lambda, "DistFromPVCut", Default::Lambda::MinDistFromPV, Cut::Limit::Minimum);
+    AddCut(V0::Species::Lambda, "CPAwrtPVCut", Default::Lambda::MinCPAwrtPV, Default::Lambda::MaxCPAwrtPV);
+    AddCut(V0::Species::Lambda, "DCAwrtPVCut", Default::Lambda::MinDCAwrtPV, Cut::Limit::Minimum);
+    AddCut(V0::Species::Lambda, "DCAbtwDauCut", Default::Lambda::MaxDCAbtwDau, Cut::Limit::Maximum);
+    AddCut(V0::Species::Lambda, "DCAnegV0Cut", Default::Lambda::MaxDCAnegV0, Cut::Limit::Maximum);
+    AddCut(V0::Species::Lambda, "DCAposV0Cut", Default::Lambda::MaxDCAposV0, Cut::Limit::Maximum);
     AddCut(V0::Species::Lambda, "ArmQtOverAlphaCut", Default::Lambda::MaxArmQtOverAlpha, Cut::Limit::Maximum);
     //
     AddCut(V0::Species::KaonZeroShort, "EtaCut", Default::KaonZeroShort::AbsMaxEta, Cut::Limit::AbsoluteMax);
     AddCut(V0::Species::KaonZeroShort, "PtCut", Default::KaonZeroShort::MinPt, Cut::Limit::Minimum);
     AddCut(V0::Species::KaonZeroShort, "MassRange", Default::KaonZeroShort::MinMass, Default::KaonZeroShort::MaxMass);
     AddCut(V0::Species::KaonZeroShort, "RadiusCut", Default::KaonZeroShort::MinRadius, Cut::Limit::Minimum);
-    // AddCut(V0::Species::KaonZeroShort, "DistFromPVCut", Default::KaonZeroShort::MinDistFromPV, Default::KaonZeroShort::MaxDistFromPV);
-    // AddCut(V0::Species::KaonZeroShort, "CPAwrtPVCut", Default::KaonZeroShort::MinCPAwrtPV, Default::KaonZeroShort::MaxCPAwrtPV);
-    // AddCut(V0::Species::KaonZeroShort, "DCAwrtPVCut", Default::KaonZeroShort::MinDCAwrtPV, Cut::Limit::Minimum);
-    // AddCut(V0::Species::KaonZeroShort, "DCAbtwDauCut", Default::KaonZeroShort::MaxDCAbtwDau, Cut::Limit::Maximum);
-    // AddCut(V0::Species::KaonZeroShort, "DCAnegV0Cut", Default::KaonZeroShort::MaxDCAnegV0, Cut::Limit::Maximum);
-    // AddCut(V0::Species::KaonZeroShort, "DCAposV0Cut", Default::KaonZeroShort::MaxDCAposV0, Cut::Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "DistFromPVCut", Default::KaonZeroShort::MinDistFromPV, Default::KaonZeroShort::MaxDistFromPV);
+    AddCut(V0::Species::KaonZeroShort, "CPAwrtPVCut", Default::KaonZeroShort::MinCPAwrtPV, Default::KaonZeroShort::MaxCPAwrtPV);
+    AddCut(V0::Species::KaonZeroShort, "DCAwrtPVCut", Default::KaonZeroShort::MinDCAwrtPV, Cut::Limit::Minimum);
+    AddCut(V0::Species::KaonZeroShort, "DCAbtwDauCut", Default::KaonZeroShort::MaxDCAbtwDau, Cut::Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "DCAnegV0Cut", Default::KaonZeroShort::MaxDCAnegV0, Cut::Limit::Maximum);
+    AddCut(V0::Species::KaonZeroShort, "DCAposV0Cut", Default::KaonZeroShort::MaxDCAposV0, Cut::Limit::Maximum);
     //
     AddCut(V0::Species::PionPair, "EtaCut", Default::PionPair::AbsMaxEta, Cut::Limit::AbsoluteMax);
     AddCut(V0::Species::PionPair, "PtCut", Default::PionPair::MinPt, Cut::Limit::Minimum);
@@ -59,13 +59,7 @@ Bool_t Inspector::Approve(Candidate::V0 v0) {
     if (!Check(v0, "DCAbtwDauCut", v0.DCAbtwDau())) return kFALSE;
     if (!Check(v0, "DCAnegV0Cut", v0.DCAnegV0())) return kFALSE;
     if (!Check(v0, "DCAposV0Cut", v0.DCAposV0())) return kFALSE;
-    if (!Check(v0, "ArmQtOverAlphaCut", v0.ArmQtOverAlpha())) {
-        InfoF("Rejected because of %s : %s (eval=%f)",                          //
-              "ArmQtOverAlphaCut",                                              //
-              GetCut(v0.GetSpecies(), "ArmQtOverAlphaCut").ToString().c_str(),  //
-              v0.ArmQtOverAlpha());
-        return kFALSE;
-    }
+    if (!Check(v0, "ArmQtOverAlphaCut", v0.ArmQtOverAlpha())) return kFALSE;
     return kTRUE;
 }
 

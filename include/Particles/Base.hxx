@@ -24,14 +24,6 @@ namespace Candidate {
 class Base {
    public:
     Base() = default;
-    Base(ROOT::Math::PxPyPzEVector lvParticle, KFParticle kfParticle, KFVertex kfPV)
-        : lvThis(lvParticle),  //
-          kfThis(kfParticle),
-          kfPV(kfPV) {
-        //
-        v3This = ROOT::Math::XYZPoint(kfThis.GetX(), kfThis.GetY(), kfThis.GetZ());
-        v3PV = ROOT::Math::XYZPoint(kfPV.GetX(), kfPV.GetY(), kfPV.GetZ());
-    }
     ~Base() = default;
 
     virtual void SetKinematics(ROOT::Math::PxPyPzEVector lorentz_vector) { lvThis = lorentz_vector; }
@@ -60,6 +52,7 @@ class Base {
     inline Double_t Xv() { return (Double_t)kfThis.GetX(); }
     inline Double_t Yv() { return (Double_t)kfThis.GetY(); }
     inline Double_t Zv() { return (Double_t)kfThis.GetZ(); }
+    inline Double_t Chi2() { return (Double_t)kfThis.GetChi2(); }
 
     inline Double_t Radius() { return v3This.Rho(); }
     inline Double_t DistFromPV() { return (v3This - v3PV).R(); }

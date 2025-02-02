@@ -44,32 +44,32 @@ void Writer::InitV0sBranches() {
 /*
  *
  */
-void Writer::FillV0(UInt_t idxV0, Candidate::V0 thisV0) {
+void Writer::FillV0(UInt_t idx_v0, Candidate::V0 new_v0) {
     //
-    V0.Idx = idxV0;
-    V0.Idx_Neg = thisV0.EsdIdxNeg;
-    V0.Idx_Pos = thisV0.EsdIdxNeg;
-    V0.PID = thisV0.PdgCode;
-    V0.Px = (Float_t)thisV0.Px();
-    V0.Py = (Float_t)thisV0.Py();
-    V0.Pz = (Float_t)thisV0.Pz();
-    V0.E = (Float_t)thisV0.E();
-    V0.Xv = thisV0.Xv();
-    V0.Yv = thisV0.Yv();
-    V0.Zv = thisV0.Zv();
-    V0.Neg_Px = (Float_t)thisV0.NegPx();
-    V0.Neg_Py = (Float_t)thisV0.NegPy();
-    V0.Neg_Pz = (Float_t)thisV0.NegPz();
-    V0.Pos_Px = (Float_t)thisV0.PosPx();
-    V0.Pos_Py = (Float_t)thisV0.PosPy();
-    V0.Pos_Pz = (Float_t)thisV0.PosPz();
+    V0.Idx = idx_v0;
+    V0.Idx_Neg = new_v0.EsdIdxNeg;
+    V0.Idx_Pos = new_v0.EsdIdxNeg;
+    V0.PID = new_v0.PdgCode;
+    V0.Px = (Float_t)new_v0.Px();
+    V0.Py = (Float_t)new_v0.Py();
+    V0.Pz = (Float_t)new_v0.Pz();
+    V0.E = (Float_t)new_v0.E();
+    V0.Xv = new_v0.Xv();
+    V0.Yv = new_v0.Yv();
+    V0.Zv = new_v0.Zv();
+    V0.Neg_Px = (Float_t)new_v0.NegPx();
+    V0.Neg_Py = (Float_t)new_v0.NegPy();
+    V0.Neg_Pz = (Float_t)new_v0.NegPz();
+    V0.Pos_Px = (Float_t)new_v0.PosPx();
+    V0.Pos_Py = (Float_t)new_v0.PosPy();
+    V0.Pos_Pz = (Float_t)new_v0.PosPz();
     if (Analysis::Settings::IsMC) {
-        V0.Idx_True = thisV0.McIdxV0;
-        V0.True_PdgCode = thisV0.McPdgCode;
-        V0.IsSecondary = thisV0.IsSecondary;
-        V0.IsSignal = thisV0.IsSignal;
-        V0.ReactionID = thisV0.ReactionID;
-        V0.IsHybrid = thisV0.IsHybrid;
+        V0.Idx_True = new_v0.McIdxV0;
+        V0.True_PdgCode = new_v0.McPdgCode;
+        V0.IsSecondary = new_v0.IsSecondary;
+        V0.IsSignal = new_v0.IsSignal;
+        V0.ReactionID = new_v0.ReactionID;
+        V0.IsHybrid = new_v0.IsHybrid;
     }
     fTree_V0s->Fill();
 }

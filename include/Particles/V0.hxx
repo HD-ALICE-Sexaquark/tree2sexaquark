@@ -26,65 +26,21 @@ class V0 : public Base {
         PionPair = 422,
     };
 
-    V0() = default;
-    ~V0() = default;
-    V0(Int_t pdgHypothesis, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                           //
-       ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos,  //
-       KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos, KFVertex kfPV)
-        : Base(lvV0, kfV0, kfPV),  //
-          PdgCode(pdgHypothesis),
-          EsdIdxNeg(EsdIdxNeg),
-          EsdIdxPos(EsdIdxPos),
-          /*  */
-          lvNeg(lvNeg),
-          lvPos(lvPos),
-          kfNeg(kfNeg),
-          kfPos(kfPos),
-          /*  */
-          IsTrue(0),
-          McIdxV0(0),
-          McPdgCode(0),
-          IsSecondary(0),
-          IsSignal(0),
-          ReactionID(0),
-          IsHybrid(0) {}
-    V0(Int_t pdgHypothesis, UInt_t EsdIdxNeg, UInt_t EsdIdxPos,                                           //
-       ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos,  //
-       KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos, KFVertex kfPV,                                //
-       Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t reactionID, Bool_t isHybrid)
-        : Base(lvV0, kfV0, kfPV),  //
-          PdgCode(pdgHypothesis),
-          EsdIdxNeg(EsdIdxNeg),
-          EsdIdxPos(EsdIdxPos),
-          /*  */
-          lvNeg(lvNeg),
-          lvPos(lvPos),
-          kfNeg(kfNeg),
-          kfPos(kfPos),
-          /*  */
-          IsTrue(isTrue),
-          McIdxV0(mcIdxV0),
-          McPdgCode(mcPdgCode),
-          IsSecondary(isSecondary),
-          IsSignal(isSignal),
-          ReactionID(reactionID),
-          IsHybrid(isHybrid) {}
-
     void SetV0Info(Int_t pdgHypothesis, UInt_t esdIdxNeg, UInt_t esdIdxPos) {
         PdgCode = pdgHypothesis;
         EsdIdxNeg = esdIdxNeg;
         EsdIdxPos = esdIdxPos;
     }
-    void SetKinematics(ROOT::Math::PxPyPzEVector lvV0, ROOT::Math::PxPyPzEVector lvNeg, ROOT::Math::PxPyPzEVector lvPos) {
-        lvThis = lvV0;
-        lvNeg = lvNeg;
-        lvPos = lvPos;
+    void SetKinematics(ROOT::Math::PxPyPzEVector lv_v0, ROOT::Math::PxPyPzEVector lv_neg, ROOT::Math::PxPyPzEVector lv_pos) {
+        lvThis = lv_v0;
+        lvNeg = lv_neg;
+        lvPos = lv_pos;
     }
-    void SetGeometry(KFParticle kfV0, KFParticle kfNeg, KFParticle kfPos) {
-        kfThis = kfV0;
+    void SetGeometry(KFParticle kf_v0, KFParticle kf_neg, KFParticle kf_pos) {
+        kfThis = kf_v0;
         v3This = ROOT::Math::XYZPoint(kfThis.GetX(), kfThis.GetY(), kfThis.GetZ());
-        kfNeg = kfNeg;
-        kfPos = kfPos;
+        kfNeg = kf_neg;
+        kfPos = kf_pos;
     }
     void SetTrueInfo(Bool_t isTrue, Int_t mcIdxV0, Int_t mcPdgCode, Bool_t isSecondary, Bool_t isSignal, Int_t reactionID, Bool_t isHybrid) {
         IsTrue = isTrue;
@@ -100,9 +56,17 @@ class V0 : public Base {
     inline Double_t NegPy() { return lvNeg.Py(); }
     inline Double_t NegPz() { return lvNeg.Pz(); }
 
+    inline Double_t NegXv() { return (Double_t)kfNeg.GetX(); }
+    inline Double_t NegYv() { return (Double_t)kfNeg.GetY(); }
+    inline Double_t NegZv() { return (Double_t)kfNeg.GetZ(); }
+
     inline Double_t PosPx() { return lvPos.Px(); }
     inline Double_t PosPy() { return lvPos.Py(); }
     inline Double_t PosPz() { return lvPos.Pz(); }
+
+    inline Double_t PosXv() { return (Double_t)kfPos.GetX(); }
+    inline Double_t PosYv() { return (Double_t)kfPos.GetY(); }
+    inline Double_t PosZv() { return (Double_t)kfPos.GetZ(); }
 
     inline Double_t DCAbtwDau() { return TMath::Abs((Double_t)kfNeg.GetDistanceFromParticle(kfPos)); }
     inline Double_t DCAnegV0() { return TMath::Abs((Double_t)kfNeg.GetDistanceFromVertex(kfThis)); }

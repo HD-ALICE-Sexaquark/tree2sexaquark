@@ -21,7 +21,7 @@ class Writer {
 
     void InitV0sTree() { fTree_V0s = new TTree("V0s", "V0s"); }
     void InitV0sBranches();
-    void FillV0(UInt_t idxV0, Candidate::V0 thisV0);
+    void FillV0(UInt_t idx_v0, Candidate::V0 new_v0);
     void WriteV0sTree() {
         if (!fTree_V0s->GetDirectory()) {
             ErrorF("TTree %s has no directory", fTree_V0s->GetName());

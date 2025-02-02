@@ -324,6 +324,7 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
             kfV0.AddDaughter(kfNeg);
             kfV0.AddDaughter(kfPos);
             /* Transport V0 and daughters */
+            /* PENDING: study further */
             kfV0.TransportToDecayVertex();
             kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdgNeg)->Mass(),  //
                                                          (Int_t)TrackNeg.Charge);
@@ -344,6 +345,22 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
             // }
             /* Apply cuts and store V0 */
             if (!Inspector.Approve(newV0)) continue;
+            /*
+            DebugF(
+                "neg_esd_idx=%i, pos_esd_idx=%i,\nV0(px,py,pz)=(%f,%f,%f),\nV0(x,y,z)=(%f,%f,%f),\n"                         //
+                "new_neg(px,py,pz)=(%f,%f,%f),\nnew_pos(px,py,pz)=(%f,%f,%f),\n"                                             //
+                "new_neg(x,y,z)=(%f,%f,%f),\nnew_pos(x,y,z)=(%f,%f,%f),\n"                                                   //
+                "v0_chi2=%f, v0_mass=%f\n"                                                                                   //
+                "v0_eta=%f, v0_pt=%f,\nv0_radius=%f, v0_dist_from_pv=%f,\nv0_cpa_wrt_pv=%f, v0_dca_wrt_pv=%f\n"              //
+                "v0_dca_btw_dau=%f, v0_dca_neg_v0=%f, v0_dca_pos_v0=%f,\nv0_qt=%f, v0_alpha=%f, v0_arm_qt_over_alpha=%f\n",  //
+                TrackNeg.Idx, TrackPos.Idx, newV0.Px(), newV0.Py(), newV0.Pz(), newV0.Xv(), newV0.Yv(), newV0.Zv(),          //
+                newV0.NegPx(), newV0.NegPy(), newV0.NegPz(), newV0.PosPx(), newV0.PosPy(), newV0.PosPz(),                    //
+                newV0.NegXv(), newV0.NegYv(), newV0.NegZv(), newV0.PosXv(), newV0.PosYv(),
+                newV0.PosZv(),                                                                                    //
+                newV0.Chi2(), newV0.Mass(),                                                                       //
+                newV0.Eta(), newV0.Pt(), newV0.Radius(), newV0.DistFromPV(), newV0.CPAwrtPV(), newV0.DCAwrtPV(),  //
+                newV0.DCAbtwDau(), newV0.DCAnegV0(), newV0.DCAposV0(), newV0.ArmQt(), newV0.ArmAlpha(), newV0.ArmQtOverAlpha());
+            */
             if (pdgV0 == -3122)
                 AntiLambdas.push_back(newV0);
             else if (pdgV0 == 3122)
@@ -353,7 +370,6 @@ void Manager::KalmanV0Finder(Int_t pdgNeg, Int_t pdgPos, Int_t pdgV0) {
             else if (pdgV0 == 422)
                 PionPairs.push_back(newV0);
             FillV0(1, newV0);
-            // InfoF("(pdg=%i) mass=%f, radius=%f", pdgV0, newV0.Mass(), newV0.Radius());
         }  // end of loop over pos. tracks
     }      // end of loop over neg. tracks
     if (pdgV0 == -3122)
