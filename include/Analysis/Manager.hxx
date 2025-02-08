@@ -122,20 +122,39 @@ class Manager : public Reader, public Writer {
 
     /* Sexaquarks */
     void ProcessFindableSexaquarks();
-    void KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products);
-    void KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdg_reaction_products);
-    void KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdg_reaction_products);
-    void KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdg_reaction_products);
+    void KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
+        if (TMath::Abs(pdg_struck_nucleon) == 2112) {
+            KalmanSexaquarkFinder_TypeA(pdg_struck_nucleon > 0);
+        } else if (TMath::Abs(pdg_struck_nucleon) == 2212) {
+            if (pdg_reaction_products.size() > 2)
+                KalmanSexaquarkFinder_TypeDE(pdg_struck_nucleon > 0);
+            else
+                KalmanSexaquarkFinder_TypeH(pdg_struck_nucleon > 0);
+        } else {
+            ErrorF("Struck nucleon %s not recognized", fPDG.GetParticle(pdg_struck_nucleon)->GetName());
+        }
+    }
+
+    void CollectTrueInfo_ChannelA();
+    void CollectTrueInfo_ChannelD();
+    void CollectTrueInfo_ChannelE();
+    void CollectTrueInfo_ChannelH();
 
     /* Cuts */
     Cuts::Inspector Inspector;
 
     /* Utilities */
+    inline Float_t GetMass(Int_t pdg_code) { return fPDG.GetParticle(pdg_code)->Mass(); }
     void CleanContainers();
     void EndOfEvent();
     void EndOfAnalysis();
 
    private:
+    /* Functions */
+    void KalmanSexaquarkFinder_TypeA(Bool_t anti_channel);
+    void KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel);
+    void KalmanSexaquarkFinder_TypeH(Bool_t anti_channel);
+
     /* -- Files */
     std::unique_ptr<TFile> InputFile;
     std::unique_ptr<TFile> OutputFile;
@@ -143,10 +162,8 @@ class Manager : public Reader, public Writer {
     TString Event_UID;
     std::unique_ptr<TDirectoryFile> Event_Dir;
     KFVertex kfPrimaryVertex;  // primary vertex
-
     /* ROOT Objects */
     TDatabasePDG fPDG;
-
     /* Containers */
     /* -- filled in `ProcessMCParticles()` */
     std::unordered_map<Long64_t, UInt_t> getMcIdx_FromMcEntry;

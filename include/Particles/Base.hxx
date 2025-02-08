@@ -40,6 +40,8 @@ class Base {
         v3PV = ROOT::Math::XYZPoint(kfPV.GetX(), kfPV.GetY(), kfPV.GetZ());
     }
 
+    KFParticle GetKf() { return kfThis; }
+
     inline Double_t Px() { return lvThis.Px(); }
     inline Double_t Py() { return lvThis.Py(); }
     inline Double_t Pz() { return lvThis.Pz(); }
@@ -53,11 +55,17 @@ class Base {
     inline Double_t Yv() { return (Double_t)kfThis.GetY(); }
     inline Double_t Zv() { return (Double_t)kfThis.GetZ(); }
     inline Double_t Chi2() { return (Double_t)kfThis.GetChi2(); }
+    inline Double_t Chi2ndf() { return Chi2() / (Double_t)kfThis.GetNDF(); }
 
     inline Double_t Radius() { return v3This.Rho(); }
     inline Double_t DistFromPV() { return (v3This - v3PV).R(); }
     inline Double_t CPAwrtPV() { return Math::CosinePointingAngle(lvThis.Vect(), v3This, v3PV); }
     inline Double_t DCAwrtPV() { return TMath::Abs(kfThis.GetDistanceFromVertex(kfPV)); }
+
+    /* True Information */
+    Bool_t IsSignal;
+    Int_t ReactionID;
+    Bool_t IsHybrid;
 
    protected:
     ROOT::Math::PxPyPzEVector lvThis;

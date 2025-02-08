@@ -8,47 +8,41 @@ namespace Tree2Sexaquark {
 /**  V0s  **/
 /*** === ***/
 
-/*
- *
- */
 void Writer::InitV0sBranches() {
     //
-    fTree_V0s->Branch("Idx", &V0.Idx);
-    fTree_V0s->Branch("Idx_Neg", &V0.Idx_Neg);
-    fTree_V0s->Branch("Idx_Pos", &V0.Idx_Pos);
-    fTree_V0s->Branch("PID", &V0.PID);
-    fTree_V0s->Branch("Px", &V0.Px);
-    fTree_V0s->Branch("Py", &V0.Py);
-    fTree_V0s->Branch("Pz", &V0.Pz);
-    fTree_V0s->Branch("E", &V0.E);
-    fTree_V0s->Branch("Xv", &V0.Xv);
-    fTree_V0s->Branch("Yv", &V0.Yv);
-    fTree_V0s->Branch("Zv", &V0.Zv);
-    fTree_V0s->Branch("Neg_Px", &V0.Neg_Px);
-    fTree_V0s->Branch("Neg_Py", &V0.Neg_Py);
-    fTree_V0s->Branch("Neg_Pz", &V0.Neg_Pz);
-    fTree_V0s->Branch("Pos_Px", &V0.Pos_Px);
-    fTree_V0s->Branch("Pos_Py", &V0.Pos_Py);
-    fTree_V0s->Branch("Pos_Pz", &V0.Pos_Pz);
+    fTree_[TreeName::V0s]->Branch("Idx", &V0.Idx);
+    fTree_[TreeName::V0s]->Branch("Neg_EsdIdx", &V0.Neg_EsdIdx);
+    fTree_[TreeName::V0s]->Branch("Pos_EsdIdx", &V0.Pos_EsdIdx);
+    fTree_[TreeName::V0s]->Branch("PID", &V0.PID);
+    fTree_[TreeName::V0s]->Branch("Px", &V0.Px);
+    fTree_[TreeName::V0s]->Branch("Py", &V0.Py);
+    fTree_[TreeName::V0s]->Branch("Pz", &V0.Pz);
+    fTree_[TreeName::V0s]->Branch("E", &V0.E);
+    fTree_[TreeName::V0s]->Branch("Xv", &V0.Xv);
+    fTree_[TreeName::V0s]->Branch("Yv", &V0.Yv);
+    fTree_[TreeName::V0s]->Branch("Zv", &V0.Zv);
+    fTree_[TreeName::V0s]->Branch("Neg_Px", &V0.Neg_Px);
+    fTree_[TreeName::V0s]->Branch("Neg_Py", &V0.Neg_Py);
+    fTree_[TreeName::V0s]->Branch("Neg_Pz", &V0.Neg_Pz);
+    fTree_[TreeName::V0s]->Branch("Pos_Px", &V0.Pos_Px);
+    fTree_[TreeName::V0s]->Branch("Pos_Py", &V0.Pos_Py);
+    fTree_[TreeName::V0s]->Branch("Pos_Pz", &V0.Pos_Pz);
     /* True Information */
     if (Analysis::Settings::IsMC) {
-        fTree_V0s->Branch("Idx_True", &V0.Idx_True);
-        fTree_V0s->Branch("True_PdgCode", &V0.True_PdgCode);
-        fTree_V0s->Branch("IsSecondary", &V0.IsSecondary);
-        fTree_V0s->Branch("IsSignal", &V0.IsSignal);
-        fTree_V0s->Branch("ReactionID", &V0.ReactionID);
-        fTree_V0s->Branch("IsHybrid", &V0.IsHybrid);
+        fTree_[TreeName::V0s]->Branch("McIdx", &V0.McIdx);
+        fTree_[TreeName::V0s]->Branch("True_PdgCode", &V0.True_PdgCode);
+        fTree_[TreeName::V0s]->Branch("IsSecondary", &V0.IsSecondary);
+        fTree_[TreeName::V0s]->Branch("IsSignal", &V0.IsSignal);
+        fTree_[TreeName::V0s]->Branch("ReactionID", &V0.ReactionID);
+        fTree_[TreeName::V0s]->Branch("IsHybrid", &V0.IsHybrid);
     }
 }
 
-/*
- *
- */
 void Writer::FillV0(UInt_t idx_v0, Candidate::V0 new_v0) {
     //
     V0.Idx = idx_v0;
-    V0.Idx_Neg = new_v0.EsdIdxNeg;
-    V0.Idx_Pos = new_v0.EsdIdxNeg;
+    V0.Neg_EsdIdx = new_v0.EsdIdxNeg;
+    V0.Pos_EsdIdx = new_v0.EsdIdxNeg;
     V0.PID = new_v0.PdgCode;
     V0.Px = (Float_t)new_v0.Px();
     V0.Py = (Float_t)new_v0.Py();
@@ -65,210 +59,398 @@ void Writer::FillV0(UInt_t idx_v0, Candidate::V0 new_v0) {
     V0.Pos_Pz = (Float_t)new_v0.PosPz();
     /* True Information */
     if (Analysis::Settings::IsMC) {
-        V0.Idx_True = new_v0.McIdxV0;
+        V0.McIdx = new_v0.McIdxV0;
         V0.True_PdgCode = new_v0.McPdgCode;
         V0.IsSecondary = new_v0.IsSecondary;
         V0.IsSignal = new_v0.IsSignal;
         V0.ReactionID = new_v0.ReactionID;
         V0.IsHybrid = new_v0.IsHybrid;
     }
-    fTree_V0s->Fill();
+    fTree_[TreeName::V0s]->Fill();
 }
 
 /*                */
 /**  Sexaquarks  **/
 /*** ========== ***/
 
-/*
- *
- */
-void Writer::InitSexaquarkBranches_TypeA() {
+void Writer::InitSexaquarkBranches_TypeA(TreeName tree_name) {
     //
-    std::vector<SexaquarkA_tt> Sexaquark = {Sexaquark_ALK0, Sexaquark_LK0};
-    std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALK0, fTree_Sexaquarks_LK0};
-    for (Int_t i = 0; i < 2; i++) {
-        /* Common Properties */
-        Tree_Sexaquarks[i]->Branch("Px", &Sexaquark[i].Px);
-        Tree_Sexaquarks[i]->Branch("Py", &Sexaquark[i].Py);
-        Tree_Sexaquarks[i]->Branch("Pz", &Sexaquark[i].Pz);
-        Tree_Sexaquarks[i]->Branch("E", &Sexaquark[i].E);
-        Tree_Sexaquarks[i]->Branch("E_asDecay", &Sexaquark[i].E_asDecay);
-        Tree_Sexaquarks[i]->Branch("Xv", &Sexaquark[i].Xv);
-        Tree_Sexaquarks[i]->Branch("Yv", &Sexaquark[i].Yv);
-        Tree_Sexaquarks[i]->Branch("Zv", &Sexaquark[i].Zv);
-        Tree_Sexaquarks[i]->Branch("DistFromPV", &Sexaquark[i].DistFromPV);
-        Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
-        Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
-        Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* True Information */
-        if (Analysis::Settings::IsMC) {
-            Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
-            Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
-            Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
-            Tree_Sexaquarks[i]->Branch("IsNonCombBkg", &Sexaquark[i].IsNonCombBkg);
-            Tree_Sexaquarks[i]->Branch("AncestorIdx", &Sexaquark[i].AncestorIdx);
-        }
-        /* Shared with Channels "A"+"D"+"E" */
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda", &Sexaquark[i].Idx_Lambda);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Neg", &Sexaquark[i].Idx_Lambda_Neg);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Pos", &Sexaquark[i].Idx_Lambda_Pos);
-        Tree_Sexaquarks[i]->Branch("Lambda_DecayLength", &Sexaquark[i].Lambda_DecayLength);
-        Tree_Sexaquarks[i]->Branch("DCALaSV", &Sexaquark[i].DCALaSV);
-        Tree_Sexaquarks[i]->Branch("DCALaNegSV", &Sexaquark[i].DCALaNegSV);
-        Tree_Sexaquarks[i]->Branch("DCALaPosSV", &Sexaquark[i].DCALaPosSV);
-        /* Shared with Channels "A"+"D"+"H" */
-        Tree_Sexaquarks[i]->Branch("OpeningAngle", &Sexaquark[i].OpeningAngle);
-        /* Specific to Channel "A" */
-        Tree_Sexaquarks[i]->Branch("Idx_K0S", &Sexaquark[i].Idx_K0S);
-        Tree_Sexaquarks[i]->Branch("Idx_K0S_Neg", &Sexaquark[i].Idx_K0S_Neg);
-        Tree_Sexaquarks[i]->Branch("Idx_K0S_Pos", &Sexaquark[i].Idx_K0S_Pos);
-        Tree_Sexaquarks[i]->Branch("K0S_DecayLength", &Sexaquark[i].K0S_DecayLength);
-        Tree_Sexaquarks[i]->Branch("DCAK0SV", &Sexaquark[i].DCAK0SV);
-        Tree_Sexaquarks[i]->Branch("DCAK0NegSV", &Sexaquark[i].DCAK0NegSV);
-        Tree_Sexaquarks[i]->Branch("DCAK0PosSV", &Sexaquark[i].DCAK0PosSV);
-        Tree_Sexaquarks[i]->Branch("DCAbtwV0s", &Sexaquark[i].DCAbtwV0s);
+    SexaquarkA_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALK0)
+        Sexaquark = &Sexaquark_ALK0;
+    else if (tree_name == TreeName::Sexaquarks_LK0)
+        Sexaquark = &Sexaquark_LK0;
+    else
+        return;
+    /* Common Properties */
+    fTree_[tree_name]->Branch("Px", &Sexaquark->Px);
+    fTree_[tree_name]->Branch("Py", &Sexaquark->Py);
+    fTree_[tree_name]->Branch("Pz", &Sexaquark->Pz);
+    fTree_[tree_name]->Branch("E", &Sexaquark->E);
+    fTree_[tree_name]->Branch("Xv", &Sexaquark->Xv);
+    fTree_[tree_name]->Branch("Yv", &Sexaquark->Yv);
+    fTree_[tree_name]->Branch("Zv", &Sexaquark->Zv);
+    fTree_[tree_name]->Branch("DistFromPV", &Sexaquark->DistFromPV);
+    fTree_[tree_name]->Branch("CPAwrtPV", &Sexaquark->CPAwrtPV);
+    fTree_[tree_name]->Branch("DCAwrtPV", &Sexaquark->DCAwrtPV);
+    fTree_[tree_name]->Branch("Chi2ndf", &Sexaquark->Chi2ndf);
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        fTree_[tree_name]->Branch("IsSignal", &Sexaquark->IsSignal);
+        fTree_[tree_name]->Branch("ReactionID", &Sexaquark->ReactionID);
+        fTree_[tree_name]->Branch("IsHybrid", &Sexaquark->IsHybrid);
+        fTree_[tree_name]->Branch("NonCombBkg_PdgCode", &Sexaquark->NonCombBkg_PdgCode);
     }
+    /* Shared with Channels "A"+"D"+"E" */
+    fTree_[tree_name]->Branch("E_asDecay", &Sexaquark->E_asDecay);
+    fTree_[tree_name]->Branch("Lambda_Idx", &Sexaquark->Lambda_Idx);
+    fTree_[tree_name]->Branch("Lambda_Neg_EsdIdx", &Sexaquark->Lambda_Neg_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_Pos_EsdIdx", &Sexaquark->Lambda_Pos_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_DecayLength", &Sexaquark->Lambda_DecayLength);
+    fTree_[tree_name]->Branch("DCALaSV", &Sexaquark->DCALaSV);
+    fTree_[tree_name]->Branch("DCALaNegSV", &Sexaquark->DCALaNegSV);
+    fTree_[tree_name]->Branch("DCALaPosSV", &Sexaquark->DCALaPosSV);
+    /* Shared with Channels "A"+"D"+"H" */
+    fTree_[tree_name]->Branch("OpeningAngle", &Sexaquark->OpeningAngle);
+    /* Specific to Channel "A" */
+    fTree_[tree_name]->Branch("K0S_Idx", &Sexaquark->K0S_Idx);
+    fTree_[tree_name]->Branch("K0S_Neg_EsdIdx", &Sexaquark->K0S_Neg_EsdIdx);
+    fTree_[tree_name]->Branch("K0S_Pos_EsdIdx", &Sexaquark->K0S_Pos_EsdIdx);
+    fTree_[tree_name]->Branch("K0S_DecayLength", &Sexaquark->K0S_DecayLength);
+    fTree_[tree_name]->Branch("DCAK0SV", &Sexaquark->DCAK0SV);
+    fTree_[tree_name]->Branch("DCAK0NegSV", &Sexaquark->DCAK0NegSV);
+    fTree_[tree_name]->Branch("DCAK0PosSV", &Sexaquark->DCAK0PosSV);
+    fTree_[tree_name]->Branch("DCAbtwV0s", &Sexaquark->DCAbtwV0s);
 }
 
-/*
- *
- */
-void Writer::InitSexaquarkBranches_TypeD() {
+void Writer::InitSexaquarkBranches_TypeD(TreeName tree_name) {
     //
-    std::vector<SexaquarkD_tt> Sexaquark = {Sexaquark_ALPK, Sexaquark_LNK};
-    std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPK, fTree_Sexaquarks_LNK};
-    for (Int_t i = 0; i < 2; i++) {
-        /* Common Properties */
-        Tree_Sexaquarks[i]->Branch("Px", &Sexaquark[i].Px);
-        Tree_Sexaquarks[i]->Branch("Py", &Sexaquark[i].Py);
-        Tree_Sexaquarks[i]->Branch("Pz", &Sexaquark[i].Pz);
-        Tree_Sexaquarks[i]->Branch("E", &Sexaquark[i].E);
-        Tree_Sexaquarks[i]->Branch("E_asDecay", &Sexaquark[i].E_asDecay);
-        Tree_Sexaquarks[i]->Branch("Xv", &Sexaquark[i].Xv);
-        Tree_Sexaquarks[i]->Branch("Yv", &Sexaquark[i].Yv);
-        Tree_Sexaquarks[i]->Branch("Zv", &Sexaquark[i].Zv);
-        Tree_Sexaquarks[i]->Branch("DistFromPV", &Sexaquark[i].DistFromPV);
-        Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
-        Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
-        Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* True Information */
-        if (Analysis::Settings::IsMC) {
-            Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
-            Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
-            Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
-            Tree_Sexaquarks[i]->Branch("IsNonCombBkg", &Sexaquark[i].IsNonCombBkg);
-            Tree_Sexaquarks[i]->Branch("AncestorIdx", &Sexaquark[i].AncestorIdx);
-        }
-        /* Shared with Channels "A"+"D"+"E" */
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda", &Sexaquark[i].Idx_Lambda);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Neg", &Sexaquark[i].Idx_Lambda_Neg);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Pos", &Sexaquark[i].Idx_Lambda_Pos);
-        Tree_Sexaquarks[i]->Branch("Lambda_DecayLength", &Sexaquark[i].Lambda_DecayLength);
-        Tree_Sexaquarks[i]->Branch("DCALaSV", &Sexaquark[i].DCALaSV);
-        Tree_Sexaquarks[i]->Branch("DCALaNegSV", &Sexaquark[i].DCALaNegSV);
-        Tree_Sexaquarks[i]->Branch("DCALaPosSV", &Sexaquark[i].DCALaPosSV);
-        /* Shared with Channels "A"+"D"+"H" */
-        Tree_Sexaquarks[i]->Branch("OpeningAngle", &Sexaquark[i].OpeningAngle);
-        /* Specific to Channel "D" */
-        Tree_Sexaquarks[i]->Branch("Idx_Kaon", &Sexaquark[i].Idx_Kaon);
-        Tree_Sexaquarks[i]->Branch("DCAKaSV", &Sexaquark[i].DCAKaSV);
-        Tree_Sexaquarks[i]->Branch("DCAKaLa", &Sexaquark[i].DCAKaLa);
-        Tree_Sexaquarks[i]->Branch("DCALaNegKa", &Sexaquark[i].DCALaNegKa);
-        Tree_Sexaquarks[i]->Branch("DCALaPosKa", &Sexaquark[i].DCALaPosKa);
+    SexaquarkD_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALPK)
+        Sexaquark = &Sexaquark_ALPK;
+    else if (tree_name == TreeName::Sexaquarks_LNK)
+        Sexaquark = &Sexaquark_LNK;
+    else
+        return;
+    /* Common Properties */
+    fTree_[tree_name]->Branch("Px", &Sexaquark->Px);
+    fTree_[tree_name]->Branch("Py", &Sexaquark->Py);
+    fTree_[tree_name]->Branch("Pz", &Sexaquark->Pz);
+    fTree_[tree_name]->Branch("E", &Sexaquark->E);
+    fTree_[tree_name]->Branch("Xv", &Sexaquark->Xv);
+    fTree_[tree_name]->Branch("Yv", &Sexaquark->Yv);
+    fTree_[tree_name]->Branch("Zv", &Sexaquark->Zv);
+    fTree_[tree_name]->Branch("DistFromPV", &Sexaquark->DistFromPV);
+    fTree_[tree_name]->Branch("CPAwrtPV", &Sexaquark->CPAwrtPV);
+    fTree_[tree_name]->Branch("DCAwrtPV", &Sexaquark->DCAwrtPV);
+    fTree_[tree_name]->Branch("Chi2ndf", &Sexaquark->Chi2ndf);
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        fTree_[tree_name]->Branch("IsSignal", &Sexaquark->IsSignal);
+        fTree_[tree_name]->Branch("ReactionID", &Sexaquark->ReactionID);
+        fTree_[tree_name]->Branch("IsHybrid", &Sexaquark->IsHybrid);
+        fTree_[tree_name]->Branch("NonCombBkg_PdgCode", &Sexaquark->NonCombBkg_PdgCode);
     }
+    /* Shared with Channels "A"+"D"+"E" */
+    fTree_[tree_name]->Branch("E_asDecay", &Sexaquark->E_asDecay);
+    fTree_[tree_name]->Branch("Lambda_Idx", &Sexaquark->Lambda_Idx);
+    fTree_[tree_name]->Branch("Lambda_Neg_EsdIdx", &Sexaquark->Lambda_Neg_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_Pos_EsdIdx", &Sexaquark->Lambda_Pos_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_DecayLength", &Sexaquark->Lambda_DecayLength);
+    fTree_[tree_name]->Branch("DCALaSV", &Sexaquark->DCALaSV);
+    fTree_[tree_name]->Branch("DCALaNegSV", &Sexaquark->DCALaNegSV);
+    fTree_[tree_name]->Branch("DCALaPosSV", &Sexaquark->DCALaPosSV);
+    /* Shared with Channels "A"+"D"+"H" */
+    fTree_[tree_name]->Branch("OpeningAngle", &Sexaquark->OpeningAngle);
+    /* Specific to Channel "D" */
+    fTree_[tree_name]->Branch("Kaon_EsdIdx", &Sexaquark->Kaon_EsdIdx);
+    fTree_[tree_name]->Branch("DCAKaSV", &Sexaquark->DCAKaSV);
+    fTree_[tree_name]->Branch("DCAKaLa", &Sexaquark->DCAKaLa);
+    fTree_[tree_name]->Branch("DCALaNegKa", &Sexaquark->DCALaNegKa);
+    fTree_[tree_name]->Branch("DCALaPosKa", &Sexaquark->DCALaPosKa);
 }
 
-/*
- *
- */
-void Writer::InitSexaquarkBranches_TypeE() {
+void Writer::InitSexaquarkBranches_TypeE(TreeName tree_name) {
     //
-    std::vector<SexaquarkE_tt> Sexaquark = {Sexaquark_ALPKPP, Sexaquark_LNKPP};
-    std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_ALPKPP, fTree_Sexaquarks_LNKPP};
-    for (Int_t i = 0; i < 2; i++) {
-        /* Common Properties */
-        Tree_Sexaquarks[i]->Branch("Px", &Sexaquark[i].Px);
-        Tree_Sexaquarks[i]->Branch("Py", &Sexaquark[i].Py);
-        Tree_Sexaquarks[i]->Branch("Pz", &Sexaquark[i].Pz);
-        Tree_Sexaquarks[i]->Branch("E", &Sexaquark[i].E);
-        Tree_Sexaquarks[i]->Branch("E_asDecay", &Sexaquark[i].E_asDecay);
-        Tree_Sexaquarks[i]->Branch("Xv", &Sexaquark[i].Xv);
-        Tree_Sexaquarks[i]->Branch("Yv", &Sexaquark[i].Yv);
-        Tree_Sexaquarks[i]->Branch("Zv", &Sexaquark[i].Zv);
-        Tree_Sexaquarks[i]->Branch("DistFromPV", &Sexaquark[i].DistFromPV);
-        Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
-        Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
-        Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* True Information */
-        if (Analysis::Settings::IsMC) {
-            Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
-            Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
-            Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
-            Tree_Sexaquarks[i]->Branch("IsNonCombBkg", &Sexaquark[i].IsNonCombBkg);
-            Tree_Sexaquarks[i]->Branch("AncestorIdx", &Sexaquark[i].AncestorIdx);
-        }
-        /* Shared with Channels "A"+"D"+"E" */
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda", &Sexaquark[i].Idx_Lambda);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Neg", &Sexaquark[i].Idx_Lambda_Neg);
-        Tree_Sexaquarks[i]->Branch("Idx_Lambda_Pos", &Sexaquark[i].Idx_Lambda_Pos);
-        Tree_Sexaquarks[i]->Branch("Lambda_DecayLength", &Sexaquark[i].Lambda_DecayLength);
-        Tree_Sexaquarks[i]->Branch("DCALaSV", &Sexaquark[i].DCALaSV);
-        Tree_Sexaquarks[i]->Branch("DCALaNegSV", &Sexaquark[i].DCALaNegSV);
-        Tree_Sexaquarks[i]->Branch("DCALaPosSV", &Sexaquark[i].DCALaPosSV);
-        /* Specific to Channel "E" */
-        Tree_Sexaquarks[i]->Branch("Idx_Kaon", &Sexaquark[i].Idx_Kaon);
-        Tree_Sexaquarks[i]->Branch("Idx_PP", &Sexaquark[i].Idx_PP);
-        Tree_Sexaquarks[i]->Branch("Idx_PiMinus", &Sexaquark[i].Idx_PiMinus);
-        Tree_Sexaquarks[i]->Branch("Idx_PiPlus", &Sexaquark[i].Idx_PiPlus);
-        Tree_Sexaquarks[i]->Branch("DCAKaSV", &Sexaquark[i].DCAKaSV);
-        Tree_Sexaquarks[i]->Branch("DCAKaLa", &Sexaquark[i].DCAKaLa);
-        Tree_Sexaquarks[i]->Branch("DCApmSV", &Sexaquark[i].DCApmSV);
-        Tree_Sexaquarks[i]->Branch("DCAppSV", &Sexaquark[i].DCAppSV);
-        Tree_Sexaquarks[i]->Branch("DCApmLa", &Sexaquark[i].DCApmLa);
-        Tree_Sexaquarks[i]->Branch("DCAppLa", &Sexaquark[i].DCAppLa);
-        Tree_Sexaquarks[i]->Branch("DCApmKa", &Sexaquark[i].DCApmKa);
-        Tree_Sexaquarks[i]->Branch("DCAppKa", &Sexaquark[i].DCAppKa);
+    SexaquarkE_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALPKPP)
+        Sexaquark = &Sexaquark_ALPKPP;
+    else if (tree_name == TreeName::Sexaquarks_LNKPP)
+        Sexaquark = &Sexaquark_LNKPP;
+    else
+        return;
+    /* Common Properties */
+    fTree_[tree_name]->Branch("Px", &Sexaquark->Px);
+    fTree_[tree_name]->Branch("Py", &Sexaquark->Py);
+    fTree_[tree_name]->Branch("Pz", &Sexaquark->Pz);
+    fTree_[tree_name]->Branch("E", &Sexaquark->E);
+    fTree_[tree_name]->Branch("Xv", &Sexaquark->Xv);
+    fTree_[tree_name]->Branch("Yv", &Sexaquark->Yv);
+    fTree_[tree_name]->Branch("Zv", &Sexaquark->Zv);
+    fTree_[tree_name]->Branch("DistFromPV", &Sexaquark->DistFromPV);
+    fTree_[tree_name]->Branch("CPAwrtPV", &Sexaquark->CPAwrtPV);
+    fTree_[tree_name]->Branch("DCAwrtPV", &Sexaquark->DCAwrtPV);
+    fTree_[tree_name]->Branch("Chi2ndf", &Sexaquark->Chi2ndf);
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        fTree_[tree_name]->Branch("IsSignal", &Sexaquark->IsSignal);
+        fTree_[tree_name]->Branch("ReactionID", &Sexaquark->ReactionID);
+        fTree_[tree_name]->Branch("IsHybrid", &Sexaquark->IsHybrid);
+        fTree_[tree_name]->Branch("NonCombBkg_PdgCode", &Sexaquark->NonCombBkg_PdgCode);
     }
+    /* Shared with Channels "A"+"D"+"E" */
+    fTree_[tree_name]->Branch("E_asDecay", &Sexaquark->E_asDecay);
+    fTree_[tree_name]->Branch("Lambda_Idx", &Sexaquark->Lambda_Idx);
+    fTree_[tree_name]->Branch("Lambda_Neg_EsdIdx", &Sexaquark->Lambda_Neg_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_Pos_EsdIdx", &Sexaquark->Lambda_Pos_EsdIdx);
+    fTree_[tree_name]->Branch("Lambda_DecayLength", &Sexaquark->Lambda_DecayLength);
+    fTree_[tree_name]->Branch("DCALaSV", &Sexaquark->DCALaSV);
+    fTree_[tree_name]->Branch("DCALaNegSV", &Sexaquark->DCALaNegSV);
+    fTree_[tree_name]->Branch("DCALaPosSV", &Sexaquark->DCALaPosSV);
+    /* Specific to Channel "E" */
+    fTree_[tree_name]->Branch("Kaon_EsdIdx", &Sexaquark->Kaon_EsdIdx);
+    fTree_[tree_name]->Branch("PionPair_Idx", &Sexaquark->PionPair_Idx);
+    fTree_[tree_name]->Branch("PiMinus_EsdIdx", &Sexaquark->PiMinus_EsdIdx);
+    fTree_[tree_name]->Branch("PiPlus_EsdIdx", &Sexaquark->PiPlus_EsdIdx);
+    fTree_[tree_name]->Branch("DCAKaSV", &Sexaquark->DCAKaSV);
+    fTree_[tree_name]->Branch("DCAKaLa", &Sexaquark->DCAKaLa);
+    fTree_[tree_name]->Branch("DCApmSV", &Sexaquark->DCApmSV);
+    fTree_[tree_name]->Branch("DCAppSV", &Sexaquark->DCAppSV);
+    fTree_[tree_name]->Branch("DCApmLa", &Sexaquark->DCApmLa);
+    fTree_[tree_name]->Branch("DCAppLa", &Sexaquark->DCAppLa);
+    fTree_[tree_name]->Branch("DCApmKa", &Sexaquark->DCApmKa);
+    fTree_[tree_name]->Branch("DCAppKa", &Sexaquark->DCAppKa);
 }
 
-/*
- *
- */
-void Writer::InitKaonPairBranches() {
+void Writer::InitKaonPairBranches(TreeName tree_name) {
     //
-    std::vector<KaonPair_tt> Sexaquark = {Sexaquark_PKPKX, Sexaquark_NKNKX};
-    std::vector<TTree*> Tree_Sexaquarks = {fTree_Sexaquarks_PKPKX, fTree_Sexaquarks_NKNKX};
-    for (Int_t i = 0; i < 2; i++) {
-        /* Common Properties */
-        Tree_Sexaquarks[i]->Branch("Px", &Sexaquark[i].Px);
-        Tree_Sexaquarks[i]->Branch("Py", &Sexaquark[i].Py);
-        Tree_Sexaquarks[i]->Branch("Pz", &Sexaquark[i].Pz);
-        Tree_Sexaquarks[i]->Branch("E", &Sexaquark[i].E);
-        Tree_Sexaquarks[i]->Branch("E_asDecay", &Sexaquark[i].E_asDecay);
-        Tree_Sexaquarks[i]->Branch("Xv", &Sexaquark[i].Xv);
-        Tree_Sexaquarks[i]->Branch("Yv", &Sexaquark[i].Yv);
-        Tree_Sexaquarks[i]->Branch("Zv", &Sexaquark[i].Zv);
-        Tree_Sexaquarks[i]->Branch("DistFromPV", &Sexaquark[i].DistFromPV);
-        Tree_Sexaquarks[i]->Branch("CPAwrtPV", &Sexaquark[i].CPAwrtPV);
-        Tree_Sexaquarks[i]->Branch("DCAwrtPV", &Sexaquark[i].DCAwrtPV);
-        Tree_Sexaquarks[i]->Branch("Chi2ndf", &Sexaquark[i].Chi2ndf);
-        /* True Information */
-        if (Analysis::Settings::IsMC) {
-            Tree_Sexaquarks[i]->Branch("IsSignal", &Sexaquark[i].IsSignal);
-            Tree_Sexaquarks[i]->Branch("ReactionID", &Sexaquark[i].ReactionID);
-            Tree_Sexaquarks[i]->Branch("IsHybrid", &Sexaquark[i].IsHybrid);
-            Tree_Sexaquarks[i]->Branch("IsNonCombBkg", &Sexaquark[i].IsNonCombBkg);
-            Tree_Sexaquarks[i]->Branch("AncestorIdx", &Sexaquark[i].AncestorIdx);
-        }
-        /* Shared with Channels "A"+"D"+"H" */
-        Tree_Sexaquarks[i]->Branch("OpeningAngle", &Sexaquark[i].OpeningAngle);
-        /* Specific to Channel "H" */
-        Tree_Sexaquarks[i]->Branch("Idx_KaonA", &Sexaquark[i].Idx_KaonA);
-        Tree_Sexaquarks[i]->Branch("Idx_KaonB", &Sexaquark[i].Idx_KaonB);
-        Tree_Sexaquarks[i]->Branch("DCAbtwKK", &Sexaquark[i].DCAbtwKK);
-        Tree_Sexaquarks[i]->Branch("DCAkaSV", &Sexaquark[i].DCAkaSV);
-        Tree_Sexaquarks[i]->Branch("DCAkbSV", &Sexaquark[i].DCAkbSV);
+    KaonPair_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_PKPKX)
+        Sexaquark = &Sexaquark_PKPKX;
+    else if (tree_name == TreeName::Sexaquarks_NKNKX)
+        Sexaquark = &Sexaquark_NKNKX;
+    else
+        return;
+    /* Common Properties */
+    fTree_[tree_name]->Branch("Px", &Sexaquark->Px);
+    fTree_[tree_name]->Branch("Py", &Sexaquark->Py);
+    fTree_[tree_name]->Branch("Pz", &Sexaquark->Pz);
+    fTree_[tree_name]->Branch("E", &Sexaquark->E);
+    fTree_[tree_name]->Branch("Xv", &Sexaquark->Xv);
+    fTree_[tree_name]->Branch("Yv", &Sexaquark->Yv);
+    fTree_[tree_name]->Branch("Zv", &Sexaquark->Zv);
+    fTree_[tree_name]->Branch("DistFromPV", &Sexaquark->DistFromPV);
+    fTree_[tree_name]->Branch("CPAwrtPV", &Sexaquark->CPAwrtPV);
+    fTree_[tree_name]->Branch("DCAwrtPV", &Sexaquark->DCAwrtPV);
+    fTree_[tree_name]->Branch("Chi2ndf", &Sexaquark->Chi2ndf);
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        fTree_[tree_name]->Branch("IsSignal", &Sexaquark->IsSignal);
+        fTree_[tree_name]->Branch("ReactionID", &Sexaquark->ReactionID);
+        fTree_[tree_name]->Branch("IsHybrid", &Sexaquark->IsHybrid);
+        fTree_[tree_name]->Branch("NonCombBkg_PdgCode", &Sexaquark->NonCombBkg_PdgCode);
     }
+    /* Shared with Channels "A"+"D"+"H" */
+    fTree_[tree_name]->Branch("OpeningAngle", &Sexaquark->OpeningAngle);
+    /* Specific to Channel "H" */
+    fTree_[tree_name]->Branch("KaonA_EsdIdx", &Sexaquark->KaonA_EsdIdx);
+    fTree_[tree_name]->Branch("KaonB_EsdIdx", &Sexaquark->KaonB_EsdIdx);
+    fTree_[tree_name]->Branch("DCAbtwKK", &Sexaquark->DCAbtwKK);
+    fTree_[tree_name]->Branch("DCAkaSV", &Sexaquark->DCAkaSV);
+    fTree_[tree_name]->Branch("DCAkbSV", &Sexaquark->DCAkbSV);
+}
+
+void Writer::FillSexaquark(TreeName tree_name, Candidate::ChannelA new_sexaquark) {
+    //
+    SexaquarkA_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALK0)
+        Sexaquark = &Sexaquark_ALK0;
+    else if (tree_name == TreeName::Sexaquarks_LK0)
+        Sexaquark = &Sexaquark_LK0;
+    else
+        return;
+    /* Common Properties */
+    Sexaquark->Px = new_sexaquark.Px();
+    Sexaquark->Py = new_sexaquark.Py();
+    Sexaquark->Pz = new_sexaquark.Pz();
+    Sexaquark->E = new_sexaquark.E();
+    Sexaquark->Xv = new_sexaquark.Xv();
+    Sexaquark->Yv = new_sexaquark.Yv();
+    Sexaquark->Zv = new_sexaquark.Zv();
+    Sexaquark->DistFromPV = new_sexaquark.DistFromPV();
+    Sexaquark->CPAwrtPV = new_sexaquark.CPAwrtPV();
+    Sexaquark->DCAwrtPV = new_sexaquark.DCAwrtPV();
+    Sexaquark->Chi2ndf = new_sexaquark.Chi2ndf();
+    /* True Information */
+    Sexaquark->IsSignal = new_sexaquark.IsSignal;
+    Sexaquark->ReactionID = new_sexaquark.ReactionID;
+    Sexaquark->IsHybrid = new_sexaquark.IsHybrid;
+    Sexaquark->NonCombBkg_PdgCode = new_sexaquark.NonCombBkg_PdgCode;
+    /* Shared with Channels "A"+"D"+"E" */
+    Sexaquark->E_asDecay = new_sexaquark.E_asDecay();
+    Sexaquark->Lambda_Idx = new_sexaquark.Lambda_Idx;
+    Sexaquark->Lambda_Neg_EsdIdx = new_sexaquark.Lambda_Neg_EsdIdx;
+    Sexaquark->Lambda_Pos_EsdIdx = new_sexaquark.Lambda_Pos_EsdIdx;
+    Sexaquark->Lambda_DecayLength = new_sexaquark.Lambda_DecayLength();
+    Sexaquark->DCALaSV = new_sexaquark.DCALaSV();
+    Sexaquark->DCALaNegSV = new_sexaquark.DCALaNegSV();
+    Sexaquark->DCALaPosSV = new_sexaquark.DCALaPosSV();
+    /* Shared with Channels "A"+"D"+"H" */
+    Sexaquark->OpeningAngle = new_sexaquark.OpeningAngle();
+    /* Specific to Channel "A" */
+    Sexaquark->K0S_Idx = new_sexaquark.K0S_Idx;
+    Sexaquark->K0S_Neg_EsdIdx = new_sexaquark.K0S_Neg_EsdIdx;
+    Sexaquark->K0S_Pos_EsdIdx = new_sexaquark.K0S_Pos_EsdIdx;
+    Sexaquark->K0S_DecayLength = new_sexaquark.K0S_DecayLength();
+    Sexaquark->DCAK0SV = new_sexaquark.DCAK0SV();
+    Sexaquark->DCAK0NegSV = new_sexaquark.DCAK0NegSV();
+    Sexaquark->DCAK0PosSV = new_sexaquark.DCAK0PosSV();
+    Sexaquark->DCAbtwV0s = new_sexaquark.DCAbtwV0s();
+    /* Fill */
+    fTree_[tree_name]->Fill();
+}
+
+void Writer::FillSexaquark(TreeName tree_name, Candidate::ChannelD new_sexaquark) {
+    //
+    SexaquarkD_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALPK)
+        Sexaquark = &Sexaquark_ALPK;
+    else if (tree_name == TreeName::Sexaquarks_LNK)
+        Sexaquark = &Sexaquark_LNK;
+    else
+        return;
+    /* Common Properties */
+    Sexaquark->Px = new_sexaquark.Px();
+    Sexaquark->Py = new_sexaquark.Py();
+    Sexaquark->Pz = new_sexaquark.Pz();
+    Sexaquark->E = new_sexaquark.E();
+    Sexaquark->Xv = new_sexaquark.Xv();
+    Sexaquark->Yv = new_sexaquark.Yv();
+    Sexaquark->Zv = new_sexaquark.Zv();
+    Sexaquark->DistFromPV = new_sexaquark.DistFromPV();
+    Sexaquark->CPAwrtPV = new_sexaquark.CPAwrtPV();
+    Sexaquark->DCAwrtPV = new_sexaquark.DCAwrtPV();
+    Sexaquark->Chi2ndf = new_sexaquark.Chi2ndf();
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        Sexaquark->IsSignal = new_sexaquark.IsSignal;
+        Sexaquark->ReactionID = new_sexaquark.ReactionID;
+        Sexaquark->IsHybrid = new_sexaquark.IsHybrid;
+        Sexaquark->NonCombBkg_PdgCode = new_sexaquark.NonCombBkg_PdgCode;
+    }
+    /* Shared with Channels "A"+"D"+"E" */
+    Sexaquark->E_asDecay = new_sexaquark.E_asDecay();
+    Sexaquark->Lambda_Idx = new_sexaquark.Lambda_Idx;
+    Sexaquark->Lambda_Neg_EsdIdx = new_sexaquark.Lambda_Neg_EsdIdx;
+    Sexaquark->Lambda_Pos_EsdIdx = new_sexaquark.Lambda_Pos_EsdIdx;
+    Sexaquark->Lambda_DecayLength = new_sexaquark.Lambda_DecayLength();
+    Sexaquark->DCALaSV = new_sexaquark.DCALaSV();
+    Sexaquark->DCALaNegSV = new_sexaquark.DCALaNegSV();
+    Sexaquark->DCALaPosSV = new_sexaquark.DCALaPosSV();
+    /* Shared with Channels "A"+"D"+"H" */
+    Sexaquark->OpeningAngle = new_sexaquark.OpeningAngle();
+    /* Specific to Channel "D" */
+    Sexaquark->Kaon_EsdIdx = new_sexaquark.Kaon_EsdIdx;
+    Sexaquark->DCAKaSV = new_sexaquark.DCAKaSV();
+    Sexaquark->DCAKaLa = new_sexaquark.DCAKaLa();
+    Sexaquark->DCALaNegKa = new_sexaquark.DCALaNegKa();
+    Sexaquark->DCALaPosKa = new_sexaquark.DCALaPosKa();
+    /* Fill */
+    fTree_[tree_name]->Fill();
+}
+
+void Writer::FillSexaquark(TreeName tree_name, Candidate::ChannelE new_sexaquark) {
+    //
+    SexaquarkE_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_ALPKPP)
+        Sexaquark = &Sexaquark_ALPKPP;
+    else if (tree_name == TreeName::Sexaquarks_LNKPP)
+        Sexaquark = &Sexaquark_LNKPP;
+    else
+        return;
+    /* Common Properties */
+    Sexaquark->Px = new_sexaquark.Px();
+    Sexaquark->Py = new_sexaquark.Py();
+    Sexaquark->Pz = new_sexaquark.Pz();
+    Sexaquark->E = new_sexaquark.E();
+    Sexaquark->Xv = new_sexaquark.Xv();
+    Sexaquark->Yv = new_sexaquark.Yv();
+    Sexaquark->Zv = new_sexaquark.Zv();
+    Sexaquark->DistFromPV = new_sexaquark.DistFromPV();
+    Sexaquark->CPAwrtPV = new_sexaquark.CPAwrtPV();
+    Sexaquark->DCAwrtPV = new_sexaquark.DCAwrtPV();
+    Sexaquark->Chi2ndf = new_sexaquark.Chi2ndf();
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        Sexaquark->IsSignal = new_sexaquark.IsSignal;
+        Sexaquark->ReactionID = new_sexaquark.ReactionID;
+        Sexaquark->IsHybrid = new_sexaquark.IsHybrid;
+        Sexaquark->NonCombBkg_PdgCode = new_sexaquark.NonCombBkg_PdgCode;
+    }
+    /* Shared with Channels "A"+"D"+"E" */
+    Sexaquark->E_asDecay = new_sexaquark.E_asDecay();
+    Sexaquark->Lambda_Idx = new_sexaquark.Lambda_Idx;
+    Sexaquark->Lambda_Neg_EsdIdx = new_sexaquark.Lambda_Neg_EsdIdx;
+    Sexaquark->Lambda_Pos_EsdIdx = new_sexaquark.Lambda_Pos_EsdIdx;
+    Sexaquark->Lambda_DecayLength = new_sexaquark.Lambda_DecayLength();
+    Sexaquark->DCALaSV = new_sexaquark.DCALaSV();
+    Sexaquark->DCALaNegSV = new_sexaquark.DCALaNegSV();
+    Sexaquark->DCALaPosSV = new_sexaquark.DCALaPosSV();
+    /* Specific to Channel "E" */
+    Sexaquark->Kaon_EsdIdx = new_sexaquark.Kaon_EsdIdx;
+    Sexaquark->PionPair_Idx = new_sexaquark.PionPair_Idx;
+    Sexaquark->PiMinus_EsdIdx = new_sexaquark.PiMinus_EsdIdx;
+    Sexaquark->PiPlus_EsdIdx = new_sexaquark.PiPlus_EsdIdx;
+    Sexaquark->DCAKaSV = new_sexaquark.DCAKaSV();
+    Sexaquark->DCAKaLa = new_sexaquark.DCAKaLa();
+    Sexaquark->DCApmSV = new_sexaquark.DCApmSV();
+    Sexaquark->DCAppSV = new_sexaquark.DCAppSV();
+    Sexaquark->DCApmLa = new_sexaquark.DCApmLa();
+    Sexaquark->DCAppLa = new_sexaquark.DCAppLa();
+    Sexaquark->DCApmKa = new_sexaquark.DCApmKa();
+    Sexaquark->DCAppKa = new_sexaquark.DCAppKa();
+    /* Fill */
+    fTree_[tree_name]->Fill();
+}
+
+void Writer::FillKaonPair(TreeName tree_name, Candidate::KaonPair new_kk) {
+    //
+    KaonPair_tt *Sexaquark;
+    if (tree_name == TreeName::Sexaquarks_PKPKX)
+        Sexaquark = &Sexaquark_PKPKX;
+    else if (tree_name == TreeName::Sexaquarks_NKNKX)
+        Sexaquark = &Sexaquark_NKNKX;
+    else
+        return;
+    /* Common Properties */
+    Sexaquark->Px = new_kk.Px();
+    Sexaquark->Py = new_kk.Py();
+    Sexaquark->Pz = new_kk.Pz();
+    Sexaquark->E = new_kk.E();
+    Sexaquark->Xv = new_kk.Xv();
+    Sexaquark->Yv = new_kk.Yv();
+    Sexaquark->Zv = new_kk.Zv();
+    Sexaquark->DistFromPV = new_kk.DistFromPV();
+    Sexaquark->CPAwrtPV = new_kk.CPAwrtPV();
+    Sexaquark->DCAwrtPV = new_kk.DCAwrtPV();
+    Sexaquark->Chi2ndf = new_kk.Chi2ndf();
+    /* True Information */
+    if (Analysis::Settings::IsMC) {
+        Sexaquark->IsSignal = new_kk.IsSignal;
+        Sexaquark->ReactionID = new_kk.ReactionID;
+        Sexaquark->IsHybrid = new_kk.IsHybrid;
+        Sexaquark->NonCombBkg_PdgCode = new_kk.NonCombBkg_PdgCode;
+    }
+    /* Shared with Channels "A"+"D"+"H" */
+    Sexaquark->OpeningAngle = new_kk.OpeningAngle();
+    /* Specific to Channel "H" */
+    Sexaquark->KaonA_EsdIdx = new_kk.KaonA_EsdIdx;
+    Sexaquark->KaonB_EsdIdx = new_kk.KaonB_EsdIdx;
+    Sexaquark->DCAbtwKK = new_kk.DCAbtwKK();
+    Sexaquark->DCAkaSV = new_kk.DCAkaSV();
+    Sexaquark->DCAkbSV = new_kk.DCAkbSV();
+    /* Fill */
+    fTree_[tree_name]->Fill();
 }
 
 }  // namespace Tree2Sexaquark

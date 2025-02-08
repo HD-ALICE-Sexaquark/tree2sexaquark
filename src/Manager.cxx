@@ -1,5 +1,6 @@
 #include "Analysis/Manager.hxx"
 
+#include <set>
 #include <unordered_set>
 
 #include "Math/Vector4D.h"
@@ -50,8 +51,15 @@ Bool_t Manager::PrepareOutputFile() {
     }
     DebugF("TFile %s (re)created successfully", Settings::PathOutputFile.c_str());
 
-    InitV0sTree();
-    InitV0sBranches();
+    InitTree(TreeName::V0s);
+    InitTree(TreeName::Sexaquarks_ALK0);
+    // InitTree(TreeName::Sexaquarks_ALPK);
+    // InitTree(TreeName::Sexaquarks_ALPKPP);
+    // InitTree(TreeName::Sexaquarks_PKPKX);
+    // InitTree(TreeName::Sexaquarks_LK0);
+    // InitTree(TreeName::Sexaquarks_LNK);
+    // InitTree(TreeName::Sexaquarks_LNKPP);
+    // InitTree(TreeName::Sexaquarks_NKNKX);
 
     return kTRUE;
 }
@@ -267,6 +275,7 @@ void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
     fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
     fTree_Tracks->SetBranchStatus("CovMatrix", 1);
     /* Declare KFParticle objects */
+    KFParticle kfV0;
     KFParticle kfNeg, kfPos;
     KFParticle kfTransportedNeg, kfTransportedPos;
     /* Declare 4-momentum vectors */
@@ -281,25 +290,25 @@ void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
     Int_t McPdgCode;
     Bool_t IsSecondary;
     Bool_t IsSignal;
-    Int_t ReactionId;
+    Int_t ReactionID;
     Bool_t IsHybrid;
     /* Choose tracks species to loop over */
-    std::vector<Long64_t> TrackEntries_Neg;
-    std::vector<Long64_t> TrackEntries_Pos;
+    std::vector<Long64_t>* TrackEntries_Neg;
+    std::vector<Long64_t>* TrackEntries_Pos;
     if (pdg_v0 == -3122) {
-        TrackEntries_Neg = TrackEntries_AntiProton;
-        TrackEntries_Pos = TrackEntries_PiPlus;
+        TrackEntries_Neg = &TrackEntries_AntiProton;
+        TrackEntries_Pos = &TrackEntries_PiPlus;
     } else if (pdg_v0 == 3122) {
-        TrackEntries_Neg = TrackEntries_PiMinus;
-        TrackEntries_Pos = TrackEntries_Proton;
+        TrackEntries_Neg = &TrackEntries_PiMinus;
+        TrackEntries_Pos = &TrackEntries_Proton;
     } else {
         /* For KaonsZeroShort and PionPairs */
-        TrackEntries_Neg = TrackEntries_PiMinus;
-        TrackEntries_Pos = TrackEntries_PiPlus;
+        TrackEntries_Neg = &TrackEntries_PiMinus;
+        TrackEntries_Pos = &TrackEntries_PiPlus;
     }
     /* Loop over all possible pairs of tracks */
-    for (Long64_t& Neg_Entry : TrackEntries_Neg) {
-        for (Long64_t& Pos_Entry : TrackEntries_Pos) {
+    for (Long64_t& Neg_Entry : *TrackEntries_Neg) {
+        for (Long64_t& Pos_Entry : *TrackEntries_Pos) {
             /* Sanity check: prevent tracks from being repeated */
             if (Neg_Entry == Pos_Entry) continue;
             /* Get tracks */
@@ -308,7 +317,6 @@ void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
             /* Kalman Filter */
             kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdg_neg)->Mass());
             kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdg_pos)->Mass());
-            KFParticle kfV0;
             kfV0.AddDaughter(kfNeg);
             kfV0.AddDaughter(kfPos);
             /* Transport V0 and daughters */ /* PENDING: study further */
@@ -327,8 +335,8 @@ void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
             newV0.SetGeometry(kfV0, kfTransportedNeg, kfTransportedPos);
             if (Settings::IsMC) {
                 CollectTrueInfo_V0(pdg_neg, pdg_pos, pdg_v0, Neg_Entry, Pos_Entry,  //
-                                   IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionId, IsHybrid);
-                newV0.SetTrueInfo(IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionId, IsHybrid);
+                                   IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionID, IsHybrid);
+                newV0.SetTrueInfo(IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionID, IsHybrid);
             }
             /* Apply cuts and store V0 */
             if (!Inspector.Approve(newV0)) continue;
@@ -397,7 +405,6 @@ void Manager::CollectTrueInfo_V0(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_hypothe
     MC_tt MC_Neg, MC_Pos;
     if (!CopyMCParticle(Neg_McEntry, MC_Neg)) return;
     if (!CopyMCParticle(Pos_McEntry, MC_Pos)) return;
-    InfoF("neg: mcidx=%u, pdg=%i, pos: mcidx=%u, pdg=%i", MC_Neg.Idx, MC_Neg.PdgCode, MC_Pos.Idx, MC_Pos.PdgCode);
     /* Pion Pairs : motherless */
     if (pdg_hypothesis == 422) {
         is_true = !MC_Neg.HasMother() && !MC_Pos.HasMother() && MC_Neg.PdgCode == pdg_neg && MC_Pos.PdgCode == pdg_pos;
@@ -467,7 +474,7 @@ void Manager::ProcessFindableSexaquarks() {
     fTree_Tracks->SetBranchStatus("Px", 1);
     fTree_Tracks->SetBranchStatus("Py", 1);
     fTree_Tracks->SetBranchStatus("Pz", 1);
-
+    /* Loop over Injected */
     for (Long64_t Reaction_Entry = 0; Reaction_Entry < GetN_Injected(); Reaction_Entry++) {
         if (!ReadInjected(Reaction_Entry)) continue;
         std::vector<Long64_t> Track_Entries;
@@ -494,39 +501,163 @@ void Manager::ProcessFindableSexaquarks() {
 }
 
 /*
- *
+ * Using Kalman Filter, reconstruct (anti-)sexaquark candidates via the reaction channel `AntiSexaquark Neutron -> AntiLambda K0S`
  */
-void Manager::KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
+void Manager::KalmanSexaquarkFinder_TypeA(Bool_t anti_channel) {
     //
-    if (pdg_reaction_products.size() > 2) {
-        KalmanSexaquarkFinder_TypeDE(pdg_reaction_products);
-    } else {
-        if (TMath::Abs(pdg_struck_nucleon) == 2112) {
-            KalmanSexaquarkFinder_TypeA(pdg_reaction_products);
-        } else {
-            KalmanSexaquarkFinder_TypeH(pdg_reaction_products);
-        }
-    }
+    Long64_t GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry;
+    Long64_t GenLambda_Neg_McEntry, GenLambda_Pos_McEntry;
+    Long64_t KaonZeroShort_Neg_TrackEntry, KaonZeroShort_Pos_TrackEntry;
+    Long64_t KaonZeroShort_Neg_McEntry, KaonZeroShort_Pos_McEntry;
+    /* Declare vectors */
+    ROOT::Math::PxPyPzEVector lvGenLambda;
+    ROOT::Math::PxPyPzEVector lvGenLambda_Neg, lvGenLambda_Pos;
+    ROOT::Math::PxPyPzEVector lvKaonZeroShort;
+    ROOT::Math::PxPyPzEVector lvKaonZeroShort_Neg, lvKaonZeroShort_Pos;
+    ROOT::Math::PxPyPzMVector lvStruckNucleon(0., 0., 0., GetMass(2112));
+    ROOT::Math::PxPyPzEVector lvSexaquark;
+    /* Candidate object */
+    UInt_t Counter = 0;
+    Candidate::ChannelA newSexaquark;
+    newSexaquark.SetPrimaryVertex(kfPrimaryVertex);
+    /* Declare KFParticle objects */
+    KFParticle kfKaonZeroShort;
+    KFParticle kfGenLambda;
+    /* Information from MC */
+    Bool_t IsSignal;
+    Int_t ReactionID;
+    Bool_t IsHybrid;
+    Int_t NonCombBkg_PdgCode;
+    /* Choose between `AntiSexaquark Neutron -> AntiLambda K0S` or `Sexaquark AntiNeutron -> Lambda K0S` */
+    std::vector<Candidate::V0>* GenericLambdas = anti_channel ? &Lambdas : &AntiLambdas;
+    TreeName Sexaquarks_TreeName = anti_channel ? TreeName::Sexaquarks_ALK0 : TreeName::Sexaquarks_LK0;
+    /* Loop over (Anti-)Lambda,KaonZeroShort pairs */
+    for (Candidate::V0 Lambda : *GenericLambdas) {
+        for (Candidate::V0 KaonZeroShort : KaonsZeroShort) {
+            /* Get track entries */
+            GenLambda_Neg_TrackEntry = GetTrackEntry(Lambda.EsdIdxNeg);
+            GenLambda_Pos_TrackEntry = GetTrackEntry(Lambda.EsdIdxPos);
+            KaonZeroShort_Neg_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxNeg);
+            KaonZeroShort_Pos_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxPos);
+            /** Sanity check: prevent any track from being repeated **/
+            std::set<Long64_t> unique_indices = {GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry, KaonZeroShort_Neg_TrackEntry,
+                                                 KaonZeroShort_Pos_TrackEntry};
+            if ((Int_t)unique_indices.size() < 4) continue;
+            /** Kalman Filter **/
+            kfGenLambda = Lambda.GetKf();
+            kfKaonZeroShort = KaonZeroShort.GetKf();
+            KFParticle kfSexaquark;
+            kfSexaquark.AddDaughter(kfGenLambda);
+            kfSexaquark.AddDaughter(kfKaonZeroShort);
+            /** Transport V0s to the secondary vertex **/
+            kfSexaquark.TransportToDecayVertex();
+            /** -- PENDING: does this even work? **/
+            kfGenLambda.SetProductionVertex(kfSexaquark);
+            kfGenLambda.TransportToProductionVertex();
+            kfKaonZeroShort.SetProductionVertex(kfSexaquark);
+            kfKaonZeroShort.TransportToProductionVertex();
+            /** Get and transport tracks **/
+            /** -- PENDING: study this further... **/
+            /*
+            kfGenLambda_Neg = Math::TransportKFParticle(kfGenLambda_Neg, kfGenLambda_Pos, GetMass(2212),  //
+                                                        (Int_t)Track_GenLambda_Neg.Charge);
+            kfGenLambda_Pos = Math::TransportKFParticle(kfGenLambda_Pos, kfGenLambda_Neg, GetMass(211),  //
+                                                        (Int_t)Track_GenLambda_Pos.Charge);
+            kfKaonZeroShort_Neg = Math::TransportKFParticle(kfKaonZeroShort_Neg, kfKaonZeroShort_Pos, GetMass(211),  //
+                                                            (Int_t)Track_KaonZeroShort_Neg.Charge);
+            kfKaonZeroShort_Pos = Math::TransportKFParticle(kfKaonZeroShort_Pos, kfKaonZeroShort_Neg, GetMass(211),  //
+                                                            (Int_t)Track_KaonZeroShort_Pos.Charge);
+            lvGenLambda_Neg =  //
+                ROOT::Math::PxPyPzMVector(kfGenLambda_Neg.Px(), kfGenLambda_Neg.Py(), kfGenLambda_Neg.Pz(), GetMass(2212));
+            lvGenLambda_Pos =  //
+                ROOT::Math::PxPyPzMVector(kfGenLambda_Pos.Px(), kfGenLambda_Pos.Py(), kfGenLambda_Pos.Pz(), GetMass(211));
+            lvKaonZeroShort_Neg =
+                ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Neg.Px(), kfKaonZeroShort_Neg.Py(), kfKaonZeroShort_Neg.Pz(), GetMass(211));
+            lvKaonZeroShort_Pos =
+                ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Pos.Px(), kfKaonZeroShort_Pos.Py(), kfKaonZeroShort_Pos.Pz(), GetMass(211));
+            lvGenLambda = lvGenLambda_Neg + lvGenLambda_Pos;
+            lvKaonZeroShort = lvKaonZeroShort_Neg + lvKaonZeroShort_Pos;
+            */
+            /** Reconstruct (anti-)sexaquark candidate **/
+            lvGenLambda = ROOT::Math::PxPyPzEVector(kfGenLambda.Px(), kfGenLambda.Py(), kfGenLambda.Pz(), kfGenLambda.E());
+            lvKaonZeroShort = ROOT::Math::PxPyPzEVector(kfKaonZeroShort.Px(), kfKaonZeroShort.Py(), kfKaonZeroShort.Pz(), kfKaonZeroShort.E());
+            lvSexaquark = lvGenLambda + lvKaonZeroShort - lvStruckNucleon;
+            /** Prepare candidate object **/
+            // newSexaquark.SetSexaquarkInfo(); // PENDING
+            newSexaquark.SetKinematics(lvSexaquark, lvGenLambda, lvKaonZeroShort);
+            newSexaquark.SetGeometry(kfSexaquark, kfGenLambda, kfKaonZeroShort,  //
+                                     Lambda.GetKfNeg(), Lambda.GetKfPos(), KaonZeroShort.GetKfNeg(), KaonZeroShort.GetKfPos());
+            /** Collect true information **/
+            /*
+                if (Settings::IsMC) {
+                CollectTrueInfo_ChannelA(); // PENDING
+                newSexaquark.SetTrueInfo(IsSignal, ReactionID, IsHybrid, NonCombBkg_PdgCode);
+                }
+            */
+            /** Apply cuts **/
+            if (!Inspector.Approve(newSexaquark)) continue;
+            /** Store **/
+            FillSexaquark(Sexaquarks_TreeName, newSexaquark);
+            Counter++;
+        }  // end of loop over K0S
+    }      // end of loop over (anti-)lambdas
+    InfoF("N Found Channel A Candidates: %u", Counter);
 }
 
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder_TypeA(std::vector<Int_t> pdg_reaction_products) {
+void Manager::KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel) {
     //
 }
 
 /*
  *
  */
-void Manager::KalmanSexaquarkFinder_TypeDE(std::vector<Int_t> pdg_reaction_products) {
+void Manager::KalmanSexaquarkFinder_TypeH(Bool_t anti_channel) {
     //
 }
 
-/*
- *
- */
-void Manager::KalmanSexaquarkFinder_TypeH(std::vector<Int_t> pdg_reaction_products) {
+void Manager::CollectTrueInfo_ChannelA() {
+    //
+    // mcIdxNeg_GenLambda = getMcIdx_fromEsdIdx[esdIdxNeg_GenLambda];
+    // mcIdxPos_GenLambda = getMcIdx_fromEsdIdx[esdIdxPos_GenLambda];
+    // mcIdxNeg_KaonZeroShort = getMcIdx_fromEsdIdx[esdIdxNeg_KaonZeroShort];
+    // mcIdxPos_KaonZeroShort = getMcIdx_fromEsdIdx[esdIdxPos_KaonZeroShort];
+    // is_signal = isMcIdxSignal[mcIdxNeg_GenLambda] && isMcIdxSignal[mcIdxPos_GenLambda] && isMcIdxSignal[mcIdxNeg_KaonZeroShort] &&
+    // isMcIdxSignal[mcIdxPos_KaonZeroShort] &&  //
+    // getPdgCode_fromMcIdx[mcIdxNeg_GenLambda] == getNegPdgCode_fromV0PdgCode[pdgCodeV0] &&
+    // getPdgCode_fromMcIdx[mcIdxPos_GenLambda] == getPosPdgCode_fromV0PdgCode[pdgCodeV0] &&
+    // getPdgCode_fromMcIdx[mcIdxNeg_KaonZeroShort] == getNegPdgCode_fromV0PdgCode[pdgCodeKaon] &&
+    // getPdgCode_fromMcIdx[mcIdxPos_KaonZeroShort] == getPosPdgCode_fromV0PdgCode[pdgCodeKaon] &&  //
+    // getReactionID_fromMcIdx[mcIdxNeg_GenLambda] == getReactionID_fromMcIdx[mcIdxPos_GenLambda] &&
+    // getReactionID_fromMcIdx[mcIdxPos_GenLambda] == getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
+    // getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] == getReactionID_fromMcIdx[mcIdxPos_KaonZeroShort];
+    // reaction_id = getReactionID_fromMcIdx[mcIdxNeg_GenLambda] == getReactionID_fromMcIdx[mcIdxPos_GenLambda] &&
+    //   getReactionID_fromMcIdx[mcIdxPos_GenLambda] == getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
+    //   getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] == getReactionID_fromMcIdx[mcIdxPos_KaonZeroShort]
+    //   ? getReactionID_fromMcIdx[mcIdxNeg_GenLambda]
+    //   : -1;
+    // is_hybrid = (isMcIdxSignal[mcIdxNeg_GenLambda] || isMcIdxSignal[mcIdxPos_GenLambda] || isMcIdxSignal[mcIdxNeg_KaonZeroShort] ||
+    //  isMcIdxSignal[mcIdxPos_KaonZeroShort]) &&
+    // !is_signal;
+    // same_ancestor = getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] != -1 &&
+    // getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] == getAncestorMcIdx_fromMcIdx[mcIdxPos_GenLambda] &&
+    // getAncestorMcIdx_fromMcIdx[mcIdxPos_GenLambda] == getAncestorMcIdx_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
+    // getAncestorMcIdx_fromMcIdx[mcIdxNeg_KaonZeroShort] == getAncestorMcIdx_fromMcIdx[mcIdxPos_KaonZeroShort];
+    // is_noncomb_bkg = !is_signal && !is_hybrid && same_ancestor;
+    // ancestor_idx = is_noncomb_bkg ? getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] : -1;
+}
+
+void Manager::CollectTrueInfo_ChannelD() {
+    //
+}
+
+void Manager::CollectTrueInfo_ChannelE() {
+    //
+}
+
+void Manager::CollectTrueInfo_ChannelH() {
     //
 }
 
@@ -584,7 +715,15 @@ void Manager::EndOfAnalysis() {
     //
     if (OutputFile) {
         OutputFile->cd();
-        WriteV0sTree();
+        WriteTree(TreeName::V0s);
+        WriteTree(TreeName::Sexaquarks_ALK0);
+        // WriteTree(TreeName::Sexaquarks_ALPK);
+        // WriteTree(TreeName::Sexaquarks_ALPKPP);
+        // WriteTree(TreeName::Sexaquarks_PKPKX);
+        // WriteTree(TreeName::Sexaquarks_LK0);
+        // WriteTree(TreeName::Sexaquarks_LNK);
+        // WriteTree(TreeName::Sexaquarks_LNKPP);
+        // WriteTree(TreeName::Sexaquarks_NKNKX);
         OutputFile->Write();
     }
 }

@@ -50,6 +50,9 @@ class V0 : public Base {
         IsHybrid = is_hybrid;
     }
 
+    KFParticle GetKfNeg() { return kfNeg; }
+    KFParticle GetKfPos() { return kfPos; }
+
     inline Double_t NegPx() { return lvNeg.Px(); }
     inline Double_t NegPy() { return lvNeg.Py(); }
     inline Double_t NegPz() { return lvNeg.Pz(); }
@@ -79,14 +82,11 @@ class V0 : public Base {
     UInt_t EsdIdxNeg;
     UInt_t EsdIdxPos;
 
-    /* -- True Information */
+    /* True Information */
     Bool_t IsTrue;
     Int_t McIdxV0;
     Int_t McPdgCode;
     Bool_t IsSecondary;
-    Bool_t IsSignal;
-    Int_t ReactionID;
-    Bool_t IsHybrid;
 
    private:
     ROOT::Math::PxPyPzEVector lvNeg;

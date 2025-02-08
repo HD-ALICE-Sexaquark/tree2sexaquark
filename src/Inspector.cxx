@@ -45,6 +45,45 @@ void Inspector::InitDefaultCuts_V0() {
 
 void Inspector::InitDefaultCuts_Sexaquark() {
     //
+    AddCut(Sexaquark::Channel::A, "Radius", Default::ChannelA::MinRadius, Cut::Limit::Minimum);
+    AddCut(Sexaquark::Channel::A, "Rapidity", Default::ChannelA::MaxRapidity, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "CPAwrtPV", Default::ChannelA::MinCPAwrtPV, Default::ChannelA::MaxCPAwrtPV);
+    AddCut(Sexaquark::Channel::A, "DCALaSV", Default::ChannelA::MaxDCALaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCALaNegSV", Default::ChannelA::MaxDCALaNegSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCALaPosSV", Default::ChannelA::MaxDCALaPosSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCAK0SV", Default::ChannelA::MaxDCAK0SV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCAK0NegSV", Default::ChannelA::MaxDCAK0NegSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCAK0PosSV", Default::ChannelA::MaxDCAK0PosSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::A, "DCAbtwV0s", Default::ChannelA::MaxDCAbtwV0s, Cut::Limit::Maximum);
+    //
+    AddCut(Sexaquark::Channel::D, "Radius", Default::ChannelD::MinRadius, Cut::Limit::Minimum);
+    AddCut(Sexaquark::Channel::D, "Rapidity", Default::ChannelD::MaxRapidity, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::D, "CPAwrtPV", Default::ChannelD::MinCPAwrtPV, Default::ChannelD::MaxCPAwrtPV);
+    AddCut(Sexaquark::Channel::D, "DCALaSV", Default::ChannelD::MaxDCALaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::D, "DCALaNegSV", Default::ChannelD::MaxDCALaNegSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::D, "DCALaPosSV", Default::ChannelD::MaxDCALaPosSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::D, "DCAKaSV", Default::ChannelD::MaxDCAKaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::D, "DCAKaLa", Default::ChannelD::MaxDCAKaLa, Cut::Limit::Maximum);
+    //
+    AddCut(Sexaquark::Channel::E, "Radius", Default::ChannelE::MinRadius, Cut::Limit::Minimum);
+    AddCut(Sexaquark::Channel::E, "Rapidity", Default::ChannelE::MaxRapidity, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "CPAwrtPV", Default::ChannelE::MinCPAwrtPV, Default::ChannelE::MaxCPAwrtPV);
+    AddCut(Sexaquark::Channel::E, "DCALaSV", Default::ChannelE::MaxDCALaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCALaNegSV", Default::ChannelE::MaxDCALaNegSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCALaPosSV", Default::ChannelE::MaxDCALaPosSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCAKaSV", Default::ChannelE::MaxDCAKaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCAKaLa", Default::ChannelE::MaxDCAKaLa, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCApmSV", Default::ChannelE::MaxDCApmSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCAppSV", Default::ChannelE::MaxDCAppSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCApmLa", Default::ChannelE::MaxDCApmLa, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCAppLa", Default::ChannelE::MaxDCAppLa, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCApmKa", Default::ChannelE::MaxDCApmKa, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::E, "DCAppKa", Default::ChannelE::MaxDCAppKa, Cut::Limit::Maximum);
+    //
+    AddCut(Sexaquark::Channel::H, "Radius", Default::KaonPair::MinRadius, Cut::Limit::Minimum);
+    AddCut(Sexaquark::Channel::H, "DCAbtwKK", Default::KaonPair::MaxDCAbtwKK, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::H, "DCAkaSV", Default::KaonPair::MaxDCAkaSV, Cut::Limit::Maximum);
+    AddCut(Sexaquark::Channel::H, "DCAkbSV", Default::KaonPair::MaxDCAkbSV, Cut::Limit::Maximum);
 }
 
 Bool_t Inspector::Approve(Candidate::V0 v0) {

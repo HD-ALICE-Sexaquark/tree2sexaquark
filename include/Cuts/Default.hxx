@@ -66,10 +66,6 @@ const Double_t MaxDCAnegV0 = 0.2;
 const Double_t MaxDCAposV0 = 0.2;
 }  // namespace PionPair
 
-// Min_KaonPair_Pt = 0.2; // PENDING
-// Max_SexaquarkD_DCAv0SV = 0.2; // PENDING
-// Max_SexaquarkE_DCAv0SV = 0.1; // PENDING
-
 namespace ChannelA {
 const Double_t MinRadius = 30.;
 const Double_t MaxRapidity = 0.8;
@@ -94,6 +90,7 @@ const Double_t MaxDCALaNegSV = 10.;
 const Double_t MaxDCALaPosSV = 10.;
 const Double_t MaxDCAKaSV = 0.2;
 const Double_t MaxDCAKaLa = 0.3;
+// Max_SexaquarkD_DCAv0SV = 0.2; // PENDING
 }  // namespace ChannelD
 
 namespace ChannelE {
@@ -112,13 +109,12 @@ const Double_t MaxDCApmLa = 0.1;
 const Double_t MaxDCAppLa = 0.1;
 const Double_t MaxDCApmKa = 0.1;
 const Double_t MaxDCAppKa = 0.1;
+// Max_SexaquarkE_DCAv0SV = 0.1; // PENDING
 }  // namespace ChannelE
 
 namespace KaonPair {
+// Min_KaonPair_Pt = 0.2; // PENDING
 const Double_t MinRadius = 30.;
-const Double_t MaxRapidity = 0.8;
-const Double_t MinCPAwrtPV = 0.99;
-const Double_t MaxCPAwrtPV = 1.;
 const Double_t MaxDCAbtwKK = 0.2;
 const Double_t MaxDCAkaSV = 0.2;
 const Double_t MaxDCAkbSV = 0.2;

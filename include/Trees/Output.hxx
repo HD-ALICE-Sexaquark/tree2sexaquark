@@ -8,16 +8,16 @@
  */
 struct V0_tt {
     UInt_t Idx;
-    UInt_t Idx_Neg;
-    UInt_t Idx_Pos;
+    UInt_t Neg_EsdIdx;
+    UInt_t Pos_EsdIdx;
     Int_t PID;
     Float_t Px;
     Float_t Py;
     Float_t Pz;
     Float_t E;
-    Float_t Xv;  //! V0 x-vertex
-    Float_t Yv;  //! V0 y-vertex
-    Float_t Zv;  //! V0 z-vertex
+    Float_t Xv;  // V0 x-vertex
+    Float_t Yv;  // V0 y-vertex
+    Float_t Zv;  // V0 z-vertex
     Float_t Neg_Px;
     Float_t Neg_Py;
     Float_t Neg_Pz;
@@ -25,7 +25,7 @@ struct V0_tt {
     Float_t Pos_Py;
     Float_t Pos_Pz;
     /* True Information */
-    Int_t Idx_True;
+    Int_t McIdx;
     Int_t True_PdgCode;
     Bool_t IsSecondary;
     Bool_t IsSignal;
@@ -41,10 +41,9 @@ struct Sexaquark_tt {
     Float_t Py;
     Float_t Pz;
     Float_t E;
-    Float_t E_asDecay;
-    Float_t Xv;  //! secondary x-vertex
-    Float_t Yv;  //! secondary y-vertex
-    Float_t Zv;  //! secondary z-vertex
+    Float_t Xv;  // secondary x-vertex
+    Float_t Yv;  // secondary y-vertex
+    Float_t Zv;  // secondary z-vertex
     Float_t DistFromPV;
     Float_t CPAwrtPV;
     Float_t DCAwrtPV;
@@ -53,8 +52,7 @@ struct Sexaquark_tt {
     Bool_t IsSignal;
     Int_t ReactionID;
     Bool_t IsHybrid;
-    Bool_t IsNonCombBkg;
-    Int_t AncestorIdx;
+    Int_t NonCombBkg_PdgCode;
 };
 
 /*
@@ -62,9 +60,10 @@ struct Sexaquark_tt {
  */
 struct SexaquarkA_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"E" */
-    Int_t Idx_Lambda;
-    Int_t Idx_Lambda_Neg;
-    Int_t Idx_Lambda_Pos;
+    Float_t E_asDecay;
+    Int_t Lambda_Idx;
+    Int_t Lambda_Neg_EsdIdx;
+    Int_t Lambda_Pos_EsdIdx;
     Float_t Lambda_DecayLength;
     Float_t DCALaSV;
     Float_t DCALaNegSV;
@@ -72,9 +71,9 @@ struct SexaquarkA_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"H" */
     Float_t OpeningAngle;
     /* Specific to Channel "A" */
-    Int_t Idx_K0S;
-    Int_t Idx_K0S_Neg;
-    Int_t Idx_K0S_Pos;
+    Int_t K0S_Idx;
+    Int_t K0S_Neg_EsdIdx;
+    Int_t K0S_Pos_EsdIdx;
     Float_t K0S_DecayLength;
     Float_t DCAK0SV;
     Float_t DCAK0NegSV;
@@ -87,9 +86,10 @@ struct SexaquarkA_tt : public Sexaquark_tt {
  */
 struct SexaquarkD_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"E" */
-    Int_t Idx_Lambda;
-    Int_t Idx_Lambda_Neg;
-    Int_t Idx_Lambda_Pos;
+    Float_t E_asDecay;
+    Int_t Lambda_Idx;
+    Int_t Lambda_Neg_EsdIdx;
+    Int_t Lambda_Pos_EsdIdx;
     Float_t Lambda_DecayLength;
     Float_t DCALaSV;
     Float_t DCALaNegSV;
@@ -97,7 +97,7 @@ struct SexaquarkD_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"H" */
     Float_t OpeningAngle;
     /* Specific to Channel "D" */
-    Int_t Idx_Kaon;
+    Int_t Kaon_EsdIdx;
     Float_t DCAKaSV;
     Float_t DCAKaLa;
     Float_t DCALaNegKa;
@@ -109,18 +109,19 @@ struct SexaquarkD_tt : public Sexaquark_tt {
  */
 struct SexaquarkE_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"E" */
-    Int_t Idx_Lambda;
-    Int_t Idx_Lambda_Neg;
-    Int_t Idx_Lambda_Pos;
+    Float_t E_asDecay;
+    Int_t Lambda_Idx;
+    Int_t Lambda_Neg_EsdIdx;
+    Int_t Lambda_Pos_EsdIdx;
     Float_t Lambda_DecayLength;
     Float_t DCALaSV;
     Float_t DCALaNegSV;
     Float_t DCALaPosSV;
     /* Specific to Channel "E" */
-    Int_t Idx_Kaon;
-    Int_t Idx_PP;
-    Int_t Idx_PiMinus;
-    Int_t Idx_PiPlus;
+    Int_t Kaon_EsdIdx;
+    Int_t PionPair_Idx;
+    Int_t PiMinus_EsdIdx;
+    Int_t PiPlus_EsdIdx;
     Float_t DCAKaSV;
     Float_t DCAKaLa;
     Float_t DCApmSV;
@@ -138,8 +139,8 @@ struct KaonPair_tt : public Sexaquark_tt {
     /* Shared with Channels "A"+"D"+"H" */
     Float_t OpeningAngle;
     /* Specific to Channel "H" */
-    UInt_t Idx_KaonA;
-    UInt_t Idx_KaonB;
+    UInt_t KaonA_EsdIdx;
+    UInt_t KaonB_EsdIdx;
     Float_t DCAbtwKK;
     Float_t DCAkaSV;
     Float_t DCAkbSV;
