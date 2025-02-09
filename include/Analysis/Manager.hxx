@@ -1,15 +1,20 @@
 #ifndef T2S_ANALYSIS_MANAGER_HXX
 #define T2S_ANALYSIS_MANAGER_HXX
 
-#include <memory>
-#include <unordered_map>
-#include <vector>
-
 #include "RtypesCore.h"
 #include "TDatabasePDG.h"
 #include "TDirectoryFile.h"
 #include "TFile.h"
+#include "TInterpreter.h"
+#include "TROOT.h"
 #include "TString.h"
+
+#include "ROOT/RDF/InterfaceUtils.hxx"
+#include "ROOT/RDataFrame.hxx"
+#include "ROOT/RVec.hxx"
+
+#include "Math/Point3Dfwd.h"
+#include "Math/Vector4Dfwd.h"
 
 #ifndef HomogeneousField
 #define HomogeneousField  // homogeneous field in z direction, required by KFParticle
@@ -19,109 +24,52 @@
 #include "Utilities/Logger.hxx"
 
 #include "Analysis/Settings.hxx"
-#include "Cuts/Inspector.hxx"
-#include "Particles/V0.hxx"
-#include "Trees/Reader.hxx"
-#include "Trees/Writer.hxx"
+// #include "Cuts/Inspector.hxx"
+// #include "Particles/V0.hxx"
+// #include "Trees/Writer.hxx"
+
+using namespace ROOT::VecOps;
+using RDataFrame = ROOT::RDataFrame;
+using RNode = ROOT::RDF::RNode;
+using RVecI = ROOT::RVecI;  // reserved for masks and indices that could be -1
+using cRVecI = const ROOT::RVecI &;
+using RVecL = ROOT::RVecL;
+using cRVecL = const ROOT::RVecL &;
+using RVecU = ROOT::RVecU;
+using cRVecU = const ROOT::RVecU &;
+using RVecUL = ROOT::RVecUL;  // reserved for protected indices
+using cRVecUL = const ROOT::RVecUL &;
+using RVecF = ROOT::RVecF;
+using cRVecF = const ROOT::RVecF &;
+
+using PxPyPzMVector = ROOT::Math::PxPyPzMVector;
+using XYZPoint = ROOT::Math::XYZPoint;
 
 namespace Tree2Sexaquark {
 namespace Analysis {
 
-class Manager : public Reader, public Writer {
+class Manager /* : public Writer */ {
    public:
     Manager() = default;
     ~Manager() = default;
 
-    Bool_t OpenInputFile();
-    Bool_t PrepareOutputFile();
-
-    /* Events */
-    Bool_t GetEvent(Long64_t evt_idx);
-    inline Long64_t GetN_Events() {
-        if (!Settings::LimitToNEvents) return GetEventsTree()->GetEntries();
-        return Settings::LimitToNEvents;
-    }
-
-    inline TTree* FindTreeInFile(TString tree_name) {
-        TTree* AuxTree = InputFile->Get<TTree>(tree_name);
-        if (!AuxTree) {
-            ErrorF("TTree %s couldn't be found in TFile %s", tree_name.Data(), InputFile->GetName());
-            return nullptr;
-        }
-        InfoF("TTree %s found in TFile %s", tree_name.Data(), InputFile->GetName());
-        return AuxTree;
-    }
-
-    inline TTree* FindTreeInEventDir(TString tree_name) {
-        TTree* AuxTree = Event_Dir->Get<TTree>(tree_name);
-        if (!AuxTree) {
-            ErrorF("TTree %s couldn't be found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
-            return nullptr;
-        }
-        InfoF("TTree %s found in TDirectoryFile %s", tree_name.Data(), Event_Dir->GetName());
-        return AuxTree;
-    }
+    void Init();
+    // Bool_t PrepareOutputFile();
+    RNode ProcessEvent(RNode df);
 
     /* Injected AntiSexaquark-Nucleon Interactions */
-    void ProcessInjected();
+    RNode ProcessInjected(RNode df);
 
     /* MC Particles */
-    void ProcessMCParticles();
-    /* -- translate between MC entries and indices */
-    inline Long64_t GetMcEntry(UInt_t mc_idx) { return getMcEntry_fromMcIdx[mc_idx]; }
-    inline UInt_t GetMcIdx(Long64_t mc_entry) { return getMcIdx_FromMcEntry[mc_entry]; }
-    /* -- necessary for V0s */
-    inline Long64_t GetMcEntryNeg(Long64_t mc_entry_mother) {
-        UInt_t mcIdxMother = GetMcIdx(mc_entry_mother);
-        if (getMcIdxNeg_fromMcIdx.find(mcIdxMother) == getMcIdxNeg_fromMcIdx.end()) return -1;
-        UInt_t mcIdxNeg = getMcIdxNeg_fromMcIdx[mcIdxMother];
-        return GetMcEntry(mcIdxNeg);
-    }
-    inline Long64_t GetMcEntryPos(Long64_t mc_entry_mother) {
-        UInt_t mcIdxMother = GetMcIdx(mc_entry_mother);
-        if (getMcIdxPos_fromMcIdx.find(mcIdxMother) == getMcIdxPos_fromMcIdx.end()) return -1;
-        UInt_t mcIdxPos = getMcIdxPos_fromMcIdx[mcIdxMother];
-        return GetMcEntry(mcIdxPos);
-    }
-    /*  */
-    inline Bool_t CopyMCParticle(Long64_t mc_entry, MC_tt& this_mc) {
-        if (!ReadMCParticle(mc_entry)) return kFALSE;
-        this_mc = MC;
-        return kTRUE;
-    }
+    RNode ProcessMCParticles(RNode df);
 
     /* Tracks */
-    void ProcessTracks();
-    /* -- translate between Track entries and ESD indices */
-    inline Long64_t GetTrackEntry(UInt_t esd_idx) { return getTrackEntry_fromEsdIdx[esd_idx]; }
-    inline UInt_t GetEsdIdx(Long64_t track_entry) { return getEsdIdx_fromTrackEntry[track_entry]; }
-    /* -- link between MC and Tracks */
-    inline Long64_t GetTrackEntryFromMcEntry(Long64_t mc_entry) {
-        UInt_t mcIdx = GetMcIdx(mc_entry);
-        if (getEsdIdx_fromMcIdx.find(mcIdx) == getEsdIdx_fromMcIdx.end()) return -1;
-        return GetTrackEntry(getEsdIdx_fromMcIdx[mcIdx]);
-    }
-    inline Long64_t GetMcEntryFromTrackEntry(Long64_t track_entry) {
-        UInt_t esdIdx = GetEsdIdx(track_entry);
-        if (getMcIdx_fromEsdIdx.find(esdIdx) == getMcIdx_fromEsdIdx.end()) return -1;
-        return GetMcEntry(getMcIdx_fromEsdIdx[esdIdx]);
-    }
-    /*  */
-    inline Bool_t CopyTrack(Long64_t track_entry, Track_tt& this_track) {
-        if (!ReadTrack(track_entry)) return kFALSE;
-        this_track = Track;
-        return kTRUE;
-    }
+    RNode ProcessTracks(RNode df);
 
     /* V0s */
-    void ProcessFindableV0s();
-    void KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0);
-    void CollectTrueInfo_V0(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_hypothesis, Long64_t neg_entry, Long64_t pos_entry,  //
-                            Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code, Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id,
-                            Bool_t& is_hybrid);
+    RNode FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos);
 
     /* Sexaquarks */
-    void ProcessFindableSexaquarks();
     void KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
         if (TMath::Abs(pdg_struck_nucleon) == 2112) {
             KalmanSexaquarkFinder_TypeA(pdg_struck_nucleon > 0);
@@ -131,7 +79,7 @@ class Manager : public Reader, public Writer {
             else
                 KalmanSexaquarkFinder_TypeH(pdg_struck_nucleon > 0);
         } else {
-            ErrorF("Struck nucleon %s not recognized", fPDG.GetParticle(pdg_struck_nucleon)->GetName());
+            ErrorF("Struck nucleon %s not recognized", TDatabasePDG::Instance()->GetParticle(pdg_struck_nucleon)->GetName());
         }
     }
 
@@ -141,12 +89,24 @@ class Manager : public Reader, public Writer {
     void CollectTrueInfo_ChannelH();
 
     /* Cuts */
-    Cuts::Inspector Inspector;
+    // Cuts::Inspector Inspector;
+
+    /* Vector Gymnastics */
+    static RVecI Mask(cRVecUL entries, size_t reference_size);
+    template <typename T>
+    static RVec<T> Extract(const RVec<T> &property, cRVecUL link_);
+    template <typename T>
+    static RVec<T> ExtractIf(const RVec<T> &property, cRVecL link_, cRVecI link_protection, T default_value);
+    template <typename T>
+    static RVec<RVec<T>> ExtractVector(const RVec<T> &property, const RVec<RVecUL> &entries_);
+    template <typename T>
+    static RVec<T> ExtractVector_First(const RVec<T> &property, const RVec<RVecUL> &entries_);
+    template <typename T>
+    static RVec<T> ExtractVector_Sum(const RVec<T> &property, const RVec<RVecUL> &entries_);
 
     /* Utilities */
-    inline Float_t GetMass(Int_t pdg_code) { return fPDG.GetParticle(pdg_code)->Mass(); }
-    void CleanContainers();
-    void EndOfEvent();
+    inline Float_t GetMass(Int_t pdg_code) { return TDatabasePDG::Instance()->GetParticle(pdg_code)->Mass(); }
+    void PrintAll(RNode df);
     void EndOfAnalysis();
 
    private:
@@ -156,42 +116,15 @@ class Manager : public Reader, public Writer {
     void KalmanSexaquarkFinder_TypeH(Bool_t anti_channel);
 
     /* -- Files */
-    std::unique_ptr<TFile> InputFile;
-    std::unique_ptr<TFile> OutputFile;
+    // std::unique_ptr<TFile> OutputFile;
     /* -- Event */
-    TString Event_UID;
-    std::unique_ptr<TDirectoryFile> Event_Dir;
     KFVertex kfPrimaryVertex;  // primary vertex
-    /* ROOT Objects */
-    TDatabasePDG fPDG;
     /* Containers */
-    /* -- filled in `ProcessMCParticles()` */
-    std::unordered_map<Long64_t, UInt_t> getMcIdx_FromMcEntry;
-    std::unordered_map<UInt_t, Long64_t> getMcEntry_fromMcIdx;
-    /*** -- and looped over in `ProcessFindableV0s()` */
-    std::vector<Long64_t> mcEntriesOfTrueV0s;
-    std::unordered_map<UInt_t, UInt_t> getMcIdxNeg_fromMcIdx;
-    std::unordered_map<UInt_t, UInt_t> getMcIdxPos_fromMcIdx;
-    /*** -- and looped over in `ProcessFindableSexaquarks()` */
-    std::map<UInt_t, std::vector<Long64_t>> getMcEntries_fromReactionID;  // NOTE: final state particles
-    /* -- filled in `ProcessTracks()` */
-    std::unordered_map<UInt_t, Long64_t> getTrackEntry_fromEsdIdx;
-    std::unordered_map<Long64_t, UInt_t> getEsdIdx_fromTrackEntry;
-    /*** -- and looped over in `ProcessFindableV0s()` */
-    std::unordered_map<UInt_t, UInt_t> getMcIdx_fromEsdIdx;
-    std::unordered_map<UInt_t, UInt_t> getEsdIdx_fromMcIdx;
-    /*** -- and looped over in `KalmanV0Finder()` and `KalmanSexaquarkFinder()` */
-    std::vector<Long64_t> TrackEntries_AntiProton;
-    std::vector<Long64_t> TrackEntries_Proton;
-    std::vector<Long64_t> TrackEntries_NegKaon;
-    std::vector<Long64_t> TrackEntries_PosKaon;
-    std::vector<Long64_t> TrackEntries_PiMinus;
-    std::vector<Long64_t> TrackEntries_PiPlus;
     /* -- filled in `KalmanV0Finder()` and looped over in `KalmanSexaquarkFinder()` */
-    std::vector<Candidate::V0> AntiLambdas;
-    std::vector<Candidate::V0> Lambdas;
-    std::vector<Candidate::V0> KaonsZeroShort;
-    std::vector<Candidate::V0> PionPairs;
+    // std::vector<Candidate::V0> AntiLambdas;
+    // std::vector<Candidate::V0> Lambdas;
+    // std::vector<Candidate::V0> KaonsZeroShort;
+    // std::vector<Candidate::V0> PionPairs;
 };
 
 }  // namespace Analysis

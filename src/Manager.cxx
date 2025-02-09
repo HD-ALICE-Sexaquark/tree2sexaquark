@@ -1,47 +1,23 @@
 #include "Analysis/Manager.hxx"
 
 #include <set>
-#include <unordered_set>
 
+#include "TROOT.h"
+
+#include "Math/Point3D.h"
 #include "Math/Vector4D.h"
 
 #include "KFParticle.h"
 
+#include "Analysis/Settings.hxx"
 #include "Cuts/Default.hxx"
+#include "Math/Common.hxx"
 #include "Math/KalmanFilter.hxx"
-#include "RtypesCore.h"
 
 namespace Tree2Sexaquark {
 namespace Analysis {
 
 /*
- *
- */
-Bool_t Manager::OpenInputFile() {
-    //
-    InputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings::PathInputFile, "READ"));
-    if (!InputFile || InputFile->IsZombie()) {
-        ErrorF("TFile %s couldn't be opened", Settings::PathInputFile.c_str());
-        return kFALSE;
-    }
-    DebugF("TFile %s opened successfully", Settings::PathInputFile.c_str());
-
-    TTree* EventsTree = FindTreeInFile("Events");
-    if (!EventsTree) return kFALSE;
-
-    SetEventsTree(EventsTree);
-    ConnectEventBranches();
-
-    Inspector.InitDefaultCuts_V0();
-    Inspector.InitDefaultCuts_Sexaquark();
-    Inspector.PrintAllCuts();
-
-    return kTRUE;
-}
-
-/*
- *
- */
 Bool_t Manager::PrepareOutputFile() {
     //
     OutputFile = std::unique_ptr<TFile>(TFile::Open((TString)Settings::PathOutputFile, "RECREATE"));
@@ -63,150 +39,270 @@ Bool_t Manager::PrepareOutputFile() {
 
     return kTRUE;
 }
+*/
 
-/*
- *
- */
-Bool_t Manager::GetEvent(Long64_t evt_idx) {
+/*                   */
+/* Vector Gymnastics */
+/* ================= */
+
+// mask a vector, e.g. {0,2} -> {1,0,1}
+RVecI Manager::Mask(cRVecUL entries, size_t reference_size) {
+    RVecI output(reference_size);
+    for (auto entry : entries) output[entry] = 1;
+    return output;
+}
+
+template <typename T>
+RVec<T> Manager::Extract(const RVec<T> &property, cRVecUL link_) {
+    return Map(link_, [&](size_t linked_entry) { return property[linked_entry]; });
+}
+
+template <typename T>
+RVec<T> Manager::ExtractIf(const RVec<T> &property, cRVecL link_, cRVecI link_protection, T default_value) {
+    RVec<T> output;
+    output.reserve(link_protection.size());
+    for (size_t i = 0; i < link_protection.size(); i++) {
+        output.emplace_back(link_protection[i] ? property[link_[i]] : default_value);
+    }
+    return output;
+}
+
+template <typename T>
+RVec<RVec<T>> Manager::ExtractVector(const RVec<T> &property, const RVec<RVecUL> &entries_) {
+    return Map(entries_, [&](cRVecUL v) { return Take(property, v); });
+}
+
+template <typename T>
+RVec<T> Manager::ExtractVector_First(const RVec<T> &property, const RVec<RVecUL> &entries_) {
+    return Map(entries_, [&](cRVecUL v) { return property[v[0]]; });
+}
+
+template <typename T>
+RVec<T> Manager::ExtractVector_Sum(const RVec<T> &property, const RVec<RVecUL> &entries_) {
+    return Map(entries_, [&](cRVecUL v) { return Sum(Take(property, v)); });
+}
+
+void Manager::Init() {
     //
-    if (!ReadEvent(evt_idx)) {
-        DebugF("Event # %lld couldn't be read, moving on...", evt_idx);
-        return kFALSE;
-    }
-    if (Settings::IsMC) {
-        if (Settings::IsSignalMC)
-            Event_UID = TString::Format("A18_%u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);  // PENDING
-        else
-            Event_UID = TString::Format("MC_%6u_%04u_%03u", Event.RunNumber, Event.DirNumber, Event.EventNumber);
-    } else {
-        Event_UID = TString::Format("DATA_%6u_%03u_%u_%03u", Event.RunNumber, Event.DirNumber, Event.DirNumberB, Event.EventNumber);
-    }
-    InfoF("Processing Event # %lld (UID = %s)", evt_idx, Event_UID.Data());
-    // InfoF(">> Centrality = %f, PV = (%f, %f, %f), B = %f", Event.Centrality, Event.PV_Xv, Event.PV_Yv, Event.PV_Zv, Event.MagneticField);
+    ROOT::EnableThreadSafety();
+    if (Analysis::Settings::NThreads > 1) ROOT::EnableImplicitMT(Analysis::Settings::NThreads);
+}
 
-    Event_Dir = std::unique_ptr<TDirectoryFile>(InputFile->Get<TDirectoryFile>(Event_UID));
-    if (!Event_Dir) {
-        DebugF("TDirectoryFile %s couldn't be found, moving on...", Event_UID.Data());
-        return kFALSE;
-    }
-
+RNode Manager::ProcessEvent(RNode df) {
+    //
     /* Set Event Properties */
     /* -- Magnetic Field */
-    KFParticle::SetField(Event.MagneticField);
+    // KFParticle::SetField(Event.MagneticField);
     /* -- Primary Vertex */
-    Float_t XYZ[3] = {Event.PV_Xv, Event.PV_Yv, Event.PV_Zv};
-    Float_t CovMatrix[6] = {Event.PV_CovMatrix[0], Event.PV_CovMatrix[1], Event.PV_CovMatrix[2],
-                            Event.PV_CovMatrix[3], Event.PV_CovMatrix[4], Event.PV_CovMatrix[5]};
-    kfPrimaryVertex = Math::CreateKFVertex(XYZ, CovMatrix);
+    // Float_t XYZ[3] = {Event.PV_Xv, Event.PV_Yv, Event.PV_Zv};
+    // Float_t CovMatrix[6] = {Event.PV_CovMatrix[0], Event.PV_CovMatrix[1], Event.PV_CovMatrix[2],
+    // Event.PV_CovMatrix[3], Event.PV_CovMatrix[4], Event.PV_CovMatrix[5]};
+    // kfPrimaryVertex = Math::CreateKFVertex(XYZ, CovMatrix);
+    auto CallCreateKFVertex = [](Float_t x, Float_t y, Float_t z, cRVecF cov_matrix) -> KFVertex {
+        Float_t XYZ[3] = {x, y, z};
+        Float_t CovMatrix[6] = {cov_matrix[0], cov_matrix[1], cov_matrix[2], cov_matrix[3], cov_matrix[4], cov_matrix[5]};
+        return Math::CreateKFVertex(XYZ, CovMatrix);
+    };
 
-    return kTRUE;
+    RNode DF_Events = df.Define("Event_KF_PV", CallCreateKFVertex, {"PV_Xv", "PV_Yv", "PV_Zv", "PV_CovMatrix"});
+
+    return DF_Events;
 }
 
-/*
- *
- */
-void Manager::ProcessInjected() {
+RNode Manager::ProcessMCParticles(RNode df) {
     //
-    TTree* InjectedTree = FindTreeInEventDir("Injected");
-    if (!InjectedTree) return;
+    auto GetCharge = [](cRVecI pdg_code) -> RVecI {
+        RVecI mc_charge;
+        mc_charge.reserve(pdg_code.size());
+        for (size_t i = 0; i < pdg_code.size(); i++) {
+            auto particle = TDatabasePDG::Instance()->GetParticle(pdg_code[i]);
+            if (!particle)
+                mc_charge.emplace_back(0);
+            else
+                mc_charge.emplace_back(Int_t(particle->Charge() / 3.));  // convert units from |e|/3 to |e|
+        }
+        return mc_charge;
+    };
+    auto GetDaughter = [](cRVecI mc_mask, cRVecL mother_mc_entry_) -> RVecL {
+        RVecL output(mc_mask.size(), -1);
+        auto daughters_entries = Nonzero(mc_mask);
+        auto mothers_entries = mother_mc_entry_[mc_mask];
+        for (size_t i = 0; i < mothers_entries.size(); i++) {
+            output[mothers_entries[i]] = daughters_entries[i];
+        }
+        return output;
+    };
+    auto GetAncestor = [](cRVecL mother_mc_entry_) -> RVecL {
+        RVecL output(mother_mc_entry_.size(), -1);
+        Int_t curr_entry;
+        for (size_t i = 0; i < mother_mc_entry_.size(); i++) {
+            // if no mother, the particle is its own ancestor
+            if (mother_mc_entry_[i] == -1) {
+                output[i] = i;
+                continue;
+            }
+            // find the last ancestor
+            curr_entry = mother_mc_entry_[i];
+            while (curr_entry != -1) {
+                output[i] = curr_entry;
+                curr_entry = mother_mc_entry_[curr_entry];
+            }
+        }
+        return output;
+    };
+    auto CallExtractInt_IfNotZero = [](cRVecI property, cRVecL link_, cRVecI link_protection) -> RVecI {
+        return ExtractIf<Int_t>(property, link_, link_protection, 0);
+    };
+    auto CallExtractUInt_IfNotZero = [](cRVecU property, cRVecL link_, cRVecI link_protection) -> RVecU {
+        return ExtractIf<UInt_t>(property, link_, link_protection, 0);
+    };
 
-    SetInjectedTree(InjectedTree);
-    ConnectInjectedBranches();
+    RNode df_MC =
+        df.Alias("MC_Mother_McEntry_", "MC_Mother_McEntry")
+            .Alias("Track_McEntry_", "Track_McEntry")
+            /* # Trivial Definitions */
+            .Define("N_MC", "MC_Px.size()")
+            .Define("MC_HasMother", "MC_Mother_McEntry_ != -1")
+            .Define("MC_IsSignal", "MC_Generator == 2")
+            .Define("MC_IsFirstGenSignal", "!MC_HasMother && MC_IsSignal")
+            .Define("MC_IsSecondary", "MC_IsSecFromMat || MC_IsSecFromWeak || MC_IsSignal")
+            .Define("MC_IsProtonKaonPion", "abs(MC_PdgCode) == 2212 || abs(MC_PdgCode) == 321 || abs(MC_PdgCode) == 211")
+            .Define("MC_Radius", "sqrt(MC_Xv * MC_Xv + MC_Yv * MC_Yv)")
+            .Define("MC_Charge", GetCharge, {"MC_PdgCode"})
+            /* # Mother */
+            .Define("MC_Mother_PdgCode", CallExtractInt_IfNotZero, {"MC_PdgCode", "MC_Mother_McEntry_", "MC_HasMother"})
+            /* # Daughters */
+            .Define("MC_IsNegDau", "MC_HasMother && MC_Charge < 0")
+            .Define("MC_IsPosDau", "MC_HasMother && MC_Charge > 0")
+            .Define("MC_NegDau_McEntry_", GetDaughter, {"MC_IsNegDau", "MC_Mother_McEntry_"})
+            .Define("MC_PosDau_McEntry_", GetDaughter, {"MC_IsPosDau", "MC_Mother_McEntry_"})
+            .Define("MC_HasNegDau", "MC_NegDau_McEntry_ != -1")
+            .Define("MC_HasPosDau", "MC_PosDau_McEntry_ != -1")
+            .Define("MC_NegDau_PdgCode", CallExtractInt_IfNotZero, {"MC_PdgCode", "MC_NegDau_McEntry_", "MC_IsNegDau"})
+            .Define("MC_PosDau_PdgCode", CallExtractInt_IfNotZero, {"MC_PdgCode", "MC_PosDau_McEntry_", "MC_IsPosDau"})
+            /* # Ancestor */
+            .Define("MC_Ancestor_McEntry_", GetAncestor, {"MC_Mother_McEntry_"})
+            .Define("MC_ReactionID", CallExtractUInt_IfNotZero, {"MC_Status", "MC_Ancestor_McEntry_", "MC_IsSignal"})
+            /* # Tracked */
+            .Define("MC_GotTracked", Mask, {"Track_McEntry_", "N_MC"})
+            .Define("MC_NegDau_GotTracked", CallExtractInt_IfNotZero, {"MC_GotTracked", "MC_NegDau_McEntry_", "MC_HasNegDau"})
+            .Define("MC_PosDau_GotTracked", CallExtractInt_IfNotZero, {"MC_GotTracked", "MC_PosDau_McEntry_", "MC_HasPosDau"})
+            /* # True V0s */
+            .Define("MC_TrueV0_IsFindable", "(abs(MC_PdgCode) == 3122 || MC_PdgCode == 310) && MC_NegDau_GotTracked && MC_PosDau_GotTracked");
 
-    for (Long64_t sexa_entry = 0; sexa_entry < GetN_Injected(); sexa_entry++) {
-        if (!ReadInjected(sexa_entry)) continue;
-        InfoF("%i, %f, %f, %f", Injected.ReactionID, Injected.Px, Injected.Py, Injected.Pz);
-    }  // end of loop over injected reactions
+    return df_MC;
 }
 
-/*
- *
- */
-void Manager::ProcessMCParticles() {
+RNode Manager::ProcessInjected(RNode df) {
     //
-    TTree* InputTree_MC = FindTreeInEventDir("MC");
-    if (!InputTree_MC) return;
-
-    SetMCTree(InputTree_MC);
-    ConnectMCBranches();
-
-    fTree_MC->SetBranchStatus("*", 0);
-    fTree_MC->SetBranchStatus("Idx", 1);
-    fTree_MC->SetBranchStatus("PdgCode", 1);
-    fTree_MC->SetBranchStatus("Idx_Mother", 1);
-    fTree_MC->SetBranchStatus("Idx_Ancestor", 1);
-    fTree_MC->SetBranchStatus("Generator", 1);
-    fTree_MC->SetBranchStatus("ReactionID", 1);
-
-    for (Long64_t MC_Entry = 0; MC_Entry < GetN_MCParticles(); MC_Entry++) {
-        if (!ReadMCParticle(MC_Entry)) continue;
-        /* Fill containers */
-        getMcIdx_FromMcEntry[MC_Entry] = MC.Idx;
-        getMcEntry_fromMcIdx[MC.Idx] = MC_Entry;
-        if (MC.PdgCode == 310 || TMath::Abs(MC.PdgCode) == 3122) mcEntriesOfTrueV0s.push_back(MC_Entry);
-        if (MC.Idx_Mother >= 0) {
-            if (MC.PdgCode == -211 || MC.PdgCode == -2212) getMcIdxNeg_fromMcIdx[MC.Idx_Mother] = MC.Idx;
-            if (MC.PdgCode == 211 || MC.PdgCode == 2212) getMcIdxPos_fromMcIdx[MC.Idx_Mother] = MC.Idx;
+    auto GetReactionProducts = [](cRVecU inj_reaction_id, cRVecU mc_reaction_id, cRVecI mc_is_firstgen_signal) -> RVec<RVecUL> {
+        RVec<RVecUL> output;
+        output.reserve(inj_reaction_id.size());
+        RVecUL products_vec;
+        products_vec.reserve(4);
+        for (auto reaction_id : inj_reaction_id) {
+            for (size_t mc_entry = 0; mc_entry < mc_reaction_id.size(); mc_entry++) {
+                if (mc_reaction_id[mc_entry] != reaction_id || !mc_is_firstgen_signal[mc_entry]) continue;
+                products_vec.emplace_back(mc_entry);
+            }
+            output.emplace_back(products_vec);
+            products_vec.clear();
         }
-        if (MC.IsFinalStateSignal()) getMcEntries_fromReactionID[(UInt_t)MC.ReactionID].push_back(MC_Entry);
-    }  // end of loop over MC particles
-    InfoF("N Found True V0s: %lu", mcEntriesOfTrueV0s.size());
+        return output;
+    };
+    auto IsFindable_InjectedSexaquark = [](cRVecI pdg_code, cRVecI mc_got_tracked, cRVecI mc_true_v0_is_findable,
+                                           const RVec<RVecUL> &injected_mc_entries_) -> RVecI {
+        RVecI output;
+        output.reserve(injected_mc_entries_.size());
+        Bool_t all_findable, mc_is_findable;
+        for (auto products_vec : injected_mc_entries_) {
+            all_findable = true;
+            for (auto mc_entry : products_vec) {
+                if (TMath::Abs(pdg_code[mc_entry]) == 3122 || pdg_code[mc_entry] == 310)
+                    mc_is_findable = mc_true_v0_is_findable[mc_entry];
+                else
+                    mc_is_findable = mc_got_tracked[mc_entry];
+                all_findable &= mc_is_findable;
+            }
+            output.emplace_back(all_findable);
+        }
+        return output;
+    };
+
+    RNode df_Injected =  //
+        df.Define("N_Injected", "Sexaquark_Px.size()")
+            .Define("Injected_Pt", "sqrt(Sexaquark_Px * Sexaquark_Px + Sexaquark_Py * Sexaquark_Py)")
+            /* # Vector Operations */
+            .Define("Injected_Products_McEntries_", GetReactionProducts, {"ReactionID", "MC_ReactionID", "MC_IsFirstGenSignal"})
+            .Define("Injected_Products_PdgCode", ExtractVector<Int_t>, {"MC_PdgCode", "Injected_Products_McEntries_"})
+            .Define("Injected_Products_GotTracked", ExtractVector<Int_t>, {"MC_GotTracked", "Injected_Products_McEntries_"})
+            .Define("Injected_Products_IsFindable", ExtractVector<Int_t>, {"MC_TrueV0_IsFindable", "Injected_Products_McEntries_"})
+            /* # Aggregated Properties */
+            .Define("Injected_Radius", ExtractVector_First<Float_t>, {"MC_Radius", "Injected_Products_McEntries_"})
+            .Define("Injected_Products_SumPx", ExtractVector_Sum<Float_t>, {"MC_Px", "Injected_Products_McEntries_"})
+            .Define("Injected_Products_SumPy", ExtractVector_Sum<Float_t>, {"MC_Py", "Injected_Products_McEntries_"})
+            .Define("Injected_Pt_AfterReaction",
+                    "sqrt(Injected_Products_SumPx * Injected_Products_SumPx + Injected_Products_SumPy * Injected_Products_SumPy)")
+            .Define("Injected_IsFindable", IsFindable_InjectedSexaquark,  //
+                    {"MC_PdgCode", "MC_GotTracked", "MC_TrueV0_IsFindable", "Injected_Products_McEntries_"});
+
+    return df_Injected;
 }
 
-/*
- *
- */
-void Manager::ProcessTracks() {
+RNode Manager::ProcessTracks(RNode df) {
     //
-    TTree* TracksTree = FindTreeInEventDir("Tracks");
-    if (!TracksTree) return;
+    auto GetTrackCovMatrix = [](cRVecF track_sigma_y2, cRVecF track_sigma_zy, cRVecF track_sigma_z2,             //
+                                cRVecF track_sigma_snp_y, cRVecF track_sigma_snp_z, cRVecF track_sigma_snp2,     //
+                                cRVecF track_sigma_tgl_y, cRVecF track_sigma_tgl_z, cRVecF track_sigma_tgl_snp,  //
+                                cRVecF track_sigma_tgl2, cRVecF track_sigma_1pt_y, cRVecF track_sigma_1pt_z,     //
+                                cRVecF track_sigma_1pt_snp, cRVecF track_sigma_1pt_tgl, cRVecF track_sigma_1pt2) -> RVec<Float_t *> {
+        RVec<Float_t *> output;
+        output.reserve(track_sigma_y2.size());
+        Float_t cov_matrix[15];
+        for (size_t track_entry = 0; track_entry < track_sigma_y2.size(); track_entry++) {
+            cov_matrix[0] = track_sigma_y2[track_entry];
+            cov_matrix[1] = track_sigma_zy[track_entry];
+            cov_matrix[2] = track_sigma_z2[track_entry];
+            cov_matrix[3] = track_sigma_snp_y[track_entry];
+            cov_matrix[4] = track_sigma_snp_z[track_entry];
+            cov_matrix[5] = track_sigma_snp2[track_entry];
+            cov_matrix[6] = track_sigma_tgl_y[track_entry];
+            cov_matrix[7] = track_sigma_tgl_z[track_entry];
+            cov_matrix[8] = track_sigma_tgl_snp[track_entry];
+            cov_matrix[9] = track_sigma_tgl2[track_entry];
+            cov_matrix[10] = track_sigma_1pt_y[track_entry];
+            cov_matrix[11] = track_sigma_1pt_z[track_entry];
+            cov_matrix[12] = track_sigma_1pt_snp[track_entry];
+            cov_matrix[13] = track_sigma_1pt_tgl[track_entry];
+            cov_matrix[14] = track_sigma_1pt2[track_entry];
+            output.emplace_back(cov_matrix);
+        }
+        return output;
+    };
 
-    SetTracksTree(TracksTree);
-    ConnectTracksBranches();
+    RNode df_Tracks =  //
+        df.Define("N_Tracks", "Track_Px.size()")
+            /* # PID */
+            .Define("Track_PID_AsAntiProton", "abs(Track_NSigmaProton) < 3. && Track_Charge < 0")
+            .Define("Track_PID_AsProton", "abs(Track_NSigmaProton) < 3. && Track_Charge > 0")
+            .Define("Track_PID_AsNegKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge < 0")
+            .Define("Track_PID_AsPosKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge > 0")
+            .Define("Track_PID_AsPiMinus", "abs(Track_NSigmaPion) < 3. && Track_Charge < 0")
+            .Define("Track_PID_AsPiPlus", "abs(Track_NSigmaPion) < 3. && Track_Charge > 0")
+            .Define("AntiProton_TrackEntry_", "Nonzero(Track_PID_AsAntiProton)")
+            .Define("Proton_TrackEntry_", "Nonzero(Track_PID_AsProton)")
+            .Define("PiMinus_TrackEntry_", "Nonzero(Track_PID_AsPiMinus)")
+            .Define("PiPlus_TrackEntry_", "Nonzero(Track_PID_AsPiPlus)")
+            /* # True Info */
+            .Define("Track_PdgCode", Extract<Int_t>, {"MC_PdgCode", "Track_McEntry"})
+            .Define("Track_IsSignal", Extract<Int_t>, {"MC_IsSignal", "Track_McEntry"})
+            /* # Utilities */
+            .Define("Track_CovMatrix", GetTrackCovMatrix,                                                              //
+                    {"Track_SigmaY2", "Track_SigmaZY", "Track_SigmaZ2", "Track_SigmaSnpY", "Track_SigmaSnpZ",          //
+                     "Track_SigmaSnp2", "Track_SigmaTglY", "Track_SigmaTglZ", "Track_SigmaTglSnp", "Track_SigmaTgl2",  //
+                     "Track_Sigma1PtY", "Track_Sigma1PtZ", "Track_Sigma1PtSnp", "Track_Sigma1PtTgl", "Track_Sigma1Pt2"});
 
-    fTree_Tracks->SetBranchStatus("*", 0);
-    fTree_Tracks->SetBranchStatus("Idx", 1);
-    fTree_Tracks->SetBranchStatus("Charge", 1);
-    fTree_Tracks->SetBranchStatus("NSigmaProton", 1);
-    fTree_Tracks->SetBranchStatus("NSigmaKaon", 1);
-    fTree_Tracks->SetBranchStatus("NSigmaPion", 1);
-    fTree_Tracks->SetBranchStatus("Idx_True", 1);
-
-    for (Long64_t Track_Entry = 0; Track_Entry < GetN_Tracks(); Track_Entry++) {
-        if (!ReadTrack(Track_Entry)) continue;
-        /* Fill containers */
-        getTrackEntry_fromEsdIdx[Track.Idx] = Track_Entry;
-        getEsdIdx_fromTrackEntry[Track_Entry] = Track.Idx;
-        if (Settings::IsMC) {
-            getMcIdx_fromEsdIdx[Track.Idx] = Track.Idx_True;
-            getEsdIdx_fromMcIdx[Track.Idx_True] = Track.Idx;
-        }
-        /* PID */
-        if (TMath::Abs(Track.NSigmaProton) < Default::Proton::MaxNSigma) {
-            if (Track.Charge < 0)
-                TrackEntries_AntiProton.push_back(Track_Entry);
-            else
-                TrackEntries_Proton.push_back(Track_Entry);
-        }
-        if (TMath::Abs(Track.NSigmaKaon) < Default::Kaon::MaxNSigma) {
-            if (Track.Charge < 0)
-                TrackEntries_NegKaon.push_back(Track_Entry);
-            else
-                TrackEntries_PosKaon.push_back(Track_Entry);
-        }
-        if (TMath::Abs(Track.NSigmaPion) < Default::Pion::MaxNSigma) {
-            if (Track.Charge < 0)
-                TrackEntries_PiMinus.push_back(Track_Entry);
-            else
-                TrackEntries_PiPlus.push_back(Track_Entry);
-        }
-    }  // end of loop over tracks
-    InfoF("N Found AntiProtons: %lu", TrackEntries_AntiProton.size());
-    InfoF("N Found Protons: %lu", TrackEntries_Proton.size());
-    InfoF("N Found Negative Kaons: %lu", TrackEntries_NegKaon.size());
-    InfoF("N Found Positive Kaons: %lu", TrackEntries_PosKaon.size());
-    InfoF("N Found Negative Pions: %lu", TrackEntries_PiMinus.size());
-    InfoF("N Found Positive Pions: %lu", TrackEntries_PiPlus.size());
+    return df_Tracks;
 }
 
 /*         */
@@ -214,399 +310,299 @@ void Manager::ProcessTracks() {
 /*** === ***/
 
 /*
- * Find all true (primary, secondary, signal) V0s for which both of their daughters were reconstructed and passed track selection
- */
-void Manager::ProcessFindableV0s() {
-    //
-    fTree_MC->SetBranchStatus("*", 0);
-    fTree_MC->SetBranchStatus("Idx", 1);
-    fTree_MC->SetBranchStatus("PdgCode", 1);
-    fTree_MC->SetBranchStatus("Idx_Mother", 1);
-    fTree_MC->SetBranchStatus("Generator", 1);
-
-    fTree_Tracks->SetBranchStatus("*", 0);
-    fTree_Tracks->SetBranchStatus("Idx", 1);
-
-    MC_tt MC_V0;
-    MC_tt MC_Neg, MC_Pos;
-    Track_tt Track_Neg, Track_Pos;
-
-    Long64_t Neg_McEntry, Pos_McEntry;
-    Long64_t Neg_TrackEntry, Pos_TrackEntry;
-
-    for (Long64_t& V0_McEntry : mcEntriesOfTrueV0s) {
-        if (!CopyMCParticle(V0_McEntry, MC_V0)) continue;
-        //
-        Neg_McEntry = GetMcEntryNeg(V0_McEntry);
-        if (!CopyMCParticle(Neg_McEntry, MC_Neg)) continue;
-        Pos_McEntry = GetMcEntryPos(V0_McEntry);
-        if (!CopyMCParticle(Pos_McEntry, MC_Pos)) continue;
-        //
-        Neg_TrackEntry = GetTrackEntryFromMcEntry(Neg_McEntry);
-        if (!CopyTrack(Neg_TrackEntry, Track_Neg)) continue;
-        Pos_TrackEntry = GetTrackEntryFromMcEntry(Pos_McEntry);
-        if (!CopyTrack(Pos_TrackEntry, Track_Pos)) continue;
-        //
-        InfoF("v0: mcidx=%u, pdg=%i, issignal=%i | neg: mcidx=%u, pdg=%i, esdidx=%u | pos: mcidx=%u, pdg=%i, esdidx=%u",  //
-              MC_V0.Idx, MC_V0.PdgCode, MC_V0.IsFirstGenSignal(),                                                         //
-              MC_Neg.Idx, MC_Neg.PdgCode, Track_Neg.Idx,                                                                  //
-              MC_Pos.Idx, MC_Pos.PdgCode, Track_Pos.Idx);
-    }  // end of loop over true V0s
-}
-
-/*
  * Find all V0s via Kalman Filter.
  */
-void Manager::KalmanV0Finder(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_v0) {
+RNode Manager::FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos) {
     //
-    Track_tt TrackNeg, TrackPos;
-    fTree_Tracks->SetBranchStatus("*", 0);
-    fTree_Tracks->SetBranchStatus("Idx", 1);
-    fTree_Tracks->SetBranchStatus("Px", 1);
-    fTree_Tracks->SetBranchStatus("Py", 1);
-    fTree_Tracks->SetBranchStatus("Pz", 1);
-    fTree_Tracks->SetBranchStatus("X", 1);
-    fTree_Tracks->SetBranchStatus("Y", 1);
-    fTree_Tracks->SetBranchStatus("Z", 1);
-    fTree_Tracks->SetBranchStatus("Charge", 1);
-    fTree_Tracks->SetBranchStatus("Alpha", 1);
-    fTree_Tracks->SetBranchStatus("Snp", 1);
-    fTree_Tracks->SetBranchStatus("Tgl", 1);
-    fTree_Tracks->SetBranchStatus("Signed1Pt", 1);
-    fTree_Tracks->SetBranchStatus("CovMatrix", 1);
-    /* Declare KFParticle objects */
-    KFParticle kfV0;
-    KFParticle kfNeg, kfPos;
-    KFParticle kfTransportedNeg, kfTransportedPos;
-    /* Declare 4-momentum vectors */
-    ROOT::Math::PxPyPzEVector lvNeg, lvPos;
-    ROOT::Math::PxPyPzEVector lvV0;
-    /* Declare the candidate object */
-    Candidate::V0 newV0;
-    newV0.SetPrimaryVertex(kfPrimaryVertex);
-    /* Information from MC */
-    Bool_t IsTrue;
-    Int_t McIdxV0;
-    Int_t McPdgCode;
-    Bool_t IsSecondary;
-    Bool_t IsSignal;
-    Int_t ReactionID;
-    Bool_t IsHybrid;
-    /* Choose tracks species to loop over */
-    std::vector<Long64_t>* TrackEntries_Neg;
-    std::vector<Long64_t>* TrackEntries_Pos;
-    if (pdg_v0 == -3122) {
-        TrackEntries_Neg = &TrackEntries_AntiProton;
-        TrackEntries_Pos = &TrackEntries_PiPlus;
-    } else if (pdg_v0 == 3122) {
-        TrackEntries_Neg = &TrackEntries_PiMinus;
-        TrackEntries_Pos = &TrackEntries_Proton;
-    } else {
-        /* For KaonsZeroShort and PionPairs */
-        TrackEntries_Neg = &TrackEntries_PiMinus;
-        TrackEntries_Pos = &TrackEntries_PiPlus;
+    std::string v0_name, neg_name, pos_name;
+    if (pdg_v0 == 3122) {
+        v0_name = "Lambdas";
+        neg_name = "PiMinus";
+        pos_name = "Proton";
+    } else if (pdg_v0 == -3122) {
+        v0_name = "AntiLambdas";
+        neg_name = "AntiProton";
+        pos_name = "PiPlus";
+    } else if (pdg_v0 == 310) {
+        v0_name = "KaonsZeroShort";
+        neg_name = "PiMinus";
+        pos_name = "PiPlus";
     }
-    /* Loop over all possible pairs of tracks */
-    for (Long64_t& Neg_Entry : *TrackEntries_Neg) {
-        for (Long64_t& Pos_Entry : *TrackEntries_Pos) {
-            /* Sanity check: prevent tracks from being repeated */
-            if (Neg_Entry == Pos_Entry) continue;
-            /* Get tracks */
-            if (!CopyTrack(Neg_Entry, TrackNeg)) continue;
-            if (!CopyTrack(Pos_Entry, TrackPos)) continue;
-            /* Kalman Filter */
-            kfNeg = Math::CreateKFParticle(TrackNeg, fPDG.GetParticle(pdg_neg)->Mass());
-            kfPos = Math::CreateKFParticle(TrackPos, fPDG.GetParticle(pdg_pos)->Mass());
-            kfV0.AddDaughter(kfNeg);
-            kfV0.AddDaughter(kfPos);
-            /* Transport V0 and daughters */ /* PENDING: study further */
-            kfV0.TransportToDecayVertex();
-            kfTransportedNeg = Math::TransportKFParticle(kfNeg, kfPos, fPDG.GetParticle(pdg_neg)->Mass(),  //
-                                                         (Int_t)TrackNeg.Charge);
-            kfTransportedPos = Math::TransportKFParticle(kfPos, kfNeg, fPDG.GetParticle(pdg_pos)->Mass(),  //
-                                                         (Int_t)TrackPos.Charge);
-            /* Reconstruct V0 */
-            lvNeg = ROOT::Math::PxPyPzMVector(kfTransportedNeg.Px(), kfTransportedNeg.Py(), kfTransportedNeg.Pz(), fPDG.GetParticle(pdg_neg)->Mass());
-            lvPos = ROOT::Math::PxPyPzMVector(kfTransportedPos.Px(), kfTransportedPos.Py(), kfTransportedPos.Pz(), fPDG.GetParticle(pdg_pos)->Mass());
-            lvV0 = lvNeg + lvPos;
-            /* Prepare V0 object */
-            newV0.SetV0Info(pdg_v0, TrackNeg.Idx, TrackPos.Idx);
-            newV0.SetKinematics(lvV0, lvNeg, lvPos);
-            newV0.SetGeometry(kfV0, kfTransportedNeg, kfTransportedPos);
-            if (Settings::IsMC) {
-                CollectTrueInfo_V0(pdg_neg, pdg_pos, pdg_v0, Neg_Entry, Pos_Entry,  //
-                                   IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionID, IsHybrid);
-                newV0.SetTrueInfo(IsTrue, McIdxV0, McPdgCode, IsSecondary, IsSignal, ReactionID, IsHybrid);
-            }
-            /* Apply cuts and store V0 */
-            if (!Inspector.Approve(newV0)) continue;
-            /*
-            DebugF(
-                "neg_esd_idx=%i, pos_esd_idx=%i,\nV0(px,py,pz)=(%f,%f,%f),\nV0(x,y,z)=(%f,%f,%f),\n"                         //
-                "new_neg(px,py,pz)=(%f,%f,%f),\nnew_pos(px,py,pz)=(%f,%f,%f),\n"                                             //
-                "new_neg(x,y,z)=(%f,%f,%f),\nnew_pos(x,y,z)=(%f,%f,%f),\n"                                                   //
-                "v0_chi2=%f, v0_mass=%f\n"                                                                                    //
-                "v0_eta=%f, v0_pt=%f,\nv0_radius=%f, v0_dist_from_pv=%f,\nv0_cpa_wrt_pv=%f, v0_dca_wrt_pv=%f\n"              //
-                "v0_dca_btw_dau=%f, v0_dca_neg_v0=%f, v0_dca_pos_v0=%f,\nv0_qt=%f, v0_alpha=%f, v0_arm_qt_over_alpha=%f\n",  //
-                TrackNeg.Idx, TrackPos.Idx, newV0.Px(), newV0.Py(), newV0.Pz(), newV0.Xv(), newV0.Yv(), newV0.Zv(),          //
-                newV0.NegPx(), newV0.NegPy(), newV0.NegPz(), newV0.PosPx(), newV0.PosPy(), newV0.PosPz(),                    //
-                newV0.NegXv(), newV0.NegYv(), newV0.NegZv(), newV0.PosXv(), newV0.PosYv(),
-                newV0.PosZv(),                                                                                    //
-                newV0.Chi2(), newV0.Mass(),                                                                       //
-                newV0.Eta(), newV0.Pt(), newV0.Radius(), newV0.DistFromPV(), newV0.CPAwrtPV(), newV0.DCAwrtPV(),  //
-                newV0.DCAbtwDau(), newV0.DCAnegV0(), newV0.DCAposV0(), newV0.ArmQt(), newV0.ArmAlpha(), newV0.ArmQtOverAlpha());
-            */
-            if (pdg_v0 == -3122)
-                AntiLambdas.push_back(newV0);
-            else if (pdg_v0 == 3122)
-                Lambdas.push_back(newV0);
-            else if (pdg_v0 == 310)
-                KaonsZeroShort.push_back(newV0);
-            else if (pdg_v0 == 422)
-                PionPairs.push_back(newV0);
-            FillV0(1, newV0);
-        }  // end of loop over pos. tracks
-    }      // end of loop over neg. tracks
-    if (pdg_v0 == -3122)
-        InfoF("N Found AntiLambdas: %lu", AntiLambdas.size());
-    else if (pdg_v0 == 3122)
-        InfoF("N Found Lambdas: %lu", Lambdas.size());
-    else if (pdg_v0 == 310)
-        InfoF("N Found KaonsZeroShort: %lu", KaonsZeroShort.size());
-    else if (pdg_v0 == 422)
-        InfoF("N Found PionPairs: %lu", PionPairs.size());
+    //
+    auto KF_V0Finder = [pdg_v0, pdg_neg, pdg_pos](cRVecUL entries_neg, cRVecUL entries_pos,                                     //
+                                                  cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z, RVecI charge,  //
+                                                  cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt, const RVec<Float_t *> &cov_matrix,
+                                                  Float_t magnetic_field, KFVertex kf_pv) -> RVec<RVecUL> {
+        KFParticle::SetField(magnetic_field);
+        const Double_t neg_mass = TDatabasePDG::Instance()->GetParticle(pdg_neg)->Mass();
+        const Double_t pos_mass = TDatabasePDG::Instance()->GetParticle(pdg_pos)->Mass();
+        RVec<RVecUL> output;
+        RVecUL a_pair(2);
+        KFParticle kf_v0, kf_neg, kf_pos;
+        PxPyPzMVector lv_v0, lv_neg, lv_pos;
+        XYZPoint v3_v0;
+        XYZPoint v3_pv(kf_pv.GetX(), kf_pv.GetY(), kf_pv.GetZ());
+        Double_t cpa_wrt_pv, dca_wrt_pv, dca_btw_dau, dca_neg_v0, dca_pos_v0;
+        Double_t arm_qt, arm_alpha;
+        for (auto neg : entries_neg) {
+            for (auto pos : entries_pos) {
+                if (neg == pos) continue;
+                /* geometry */
+                kf_neg = Math::CreateKFParticle(px[neg], py[neg], pz[neg], x[neg], y[neg], z[neg], charge[neg], alpha[neg], snp[neg], tgl[neg],
+                                                signed1pt[neg], cov_matrix[neg], neg_mass);
+                kf_pos = Math::CreateKFParticle(px[pos], py[pos], pz[pos], x[pos], y[pos], z[pos], charge[pos], alpha[pos], snp[pos], tgl[pos],
+                                                signed1pt[pos], cov_matrix[pos], pos_mass);
+                KFParticle kf_v0;
+                kf_v0.AddDaughter(kf_neg);
+                kf_v0.AddDaughter(kf_pos);
+                v3_v0.SetCoordinates(kf_v0.GetX(), kf_v0.GetY(), kf_v0.GetZ());
+                /* kinematics */
+                lv_neg.SetCoordinates(kf_neg.Px(), kf_neg.Py(), kf_neg.Pz(), neg_mass);
+                lv_pos.SetCoordinates(kf_pos.Px(), kf_pos.Py(), kf_pos.Pz(), pos_mass);
+                lv_v0 = lv_neg + lv_pos;
+                /* cuts */
+                if (TMath::Abs(lv_v0.Eta()) > Default::Lambda::AbsMaxEta) continue;
+                if (lv_v0.Pt() < Default::Lambda::MinPt) continue;
+                if (lv_v0.M() < Default::Lambda::MinMass || lv_v0.M() > Default::Lambda::MaxMass) continue;
+                if (v3_v0.Rho() < Default::Lambda::MinRadius) continue;
+                if ((v3_v0 - v3_pv).R() < Default::Lambda::MinDistFromPV) continue;
+                /*  */ cpa_wrt_pv = Math::CosinePointingAngle(lv_v0.Vect(), v3_v0, v3_pv);
+                if (cpa_wrt_pv < Default::Lambda::MinCPAwrtPV || cpa_wrt_pv > Default::Lambda::MaxCPAwrtPV) continue;
+                /*  */ dca_wrt_pv = TMath::Abs((Double_t)kf_v0.GetDistanceFromVertex(kf_pv));
+                if (dca_wrt_pv < Default::Lambda::MinDCAwrtPV) continue;
+                /*  */ dca_btw_dau = TMath::Abs((Double_t)kf_neg.GetDistanceFromParticle(kf_pos));
+                if (dca_btw_dau > Default::Lambda::MaxDCAbtwDau) continue;
+                /*  */ dca_neg_v0 = TMath::Abs((Double_t)kf_neg.GetDistanceFromVertex(kf_v0));
+                if (dca_neg_v0 > Default::Lambda::MaxDCAnegV0) continue;
+                /*  */ dca_pos_v0 = TMath::Abs((Double_t)kf_pos.GetDistanceFromVertex(kf_v0));
+                if (dca_pos_v0 > Default::Lambda::MaxDCAposV0) continue;
+                /*  */ arm_qt = Math::ArmenterosQt(lv_v0.Vect(), lv_neg.Vect());
+                /*  */ arm_alpha = Math::ArmenterosAlpha(lv_v0.Vect(), lv_neg.Vect(), lv_pos.Vect());
+                if (arm_qt / TMath::Abs(arm_alpha) > Default::Lambda::MaxArmQtOverAlpha) continue;
+                std::cout << lv_v0.M() << std::endl;
+                /* store */
+                a_pair[0] = neg;
+                a_pair[1] = pos;
+                output.emplace_back(a_pair);
+            }  // end of loop over pos
+        }      // end of loop over neg
+        return output;
+    };
+    //
+    auto GetTrueV0 = [pdg_v0, pdg_neg, pdg_pos](RVecI pdg_code, const RVec<RVecUL> &v0_track_entries_, cRVecUL track_mc_entry_,
+                                                cRVecL mother_mc_entry_) -> RVecL {
+        RVecL output;
+        output.reserve(v0_track_entries_.size());
+        size_t mc_neg, mc_pos;
+        size_t neg_mother, pos_mother;
+        for (size_t v0_entry = 0; v0_entry < v0_track_entries_.size(); v0_entry++) {
+            mc_neg = track_mc_entry_[v0_track_entries_[v0_entry][0]];
+            mc_pos = track_mc_entry_[v0_track_entries_[v0_entry][1]];
+            neg_mother = mother_mc_entry_[mc_neg];
+            pos_mother = mother_mc_entry_[mc_pos];
+            if (pdg_code[mc_neg] == pdg_neg && pdg_code[mc_pos] == pdg_pos && neg_mother == pos_mother && pdg_code[neg_mother] == pdg_v0)
+                output.emplace_back(neg_mother);
+            else
+                output.emplace_back(-1);
+        }
+        return output;
+    };
+    auto IsHybrid = [](cRVecI v0_is_signal, cRVecI mc_is_signal, const RVec<RVecUL> &v0_track_entries_, cRVecUL track_mc_entry_) -> RVecI {
+        RVecI output;
+        output.reserve(v0_is_signal.size());
+        size_t mc_neg, mc_pos;
+        for (size_t v0_entry = 0; v0_entry < v0_is_signal.size(); v0_entry++) {
+            mc_neg = track_mc_entry_[v0_track_entries_[v0_entry][0]];
+            mc_pos = track_mc_entry_[v0_track_entries_[v0_entry][1]];
+            output.emplace_back(!v0_is_signal[v0_entry] &&
+                                ((mc_is_signal[mc_neg] && !mc_is_signal[mc_pos]) || (!mc_is_signal[mc_neg] && mc_is_signal[mc_pos])));
+        }
+        return output;
+    };
+    auto CallExtractInt_IfNotZero = [](cRVecI property, cRVecL link_, cRVecI link_protection) -> RVecI {
+        return ExtractIf<Int_t>(property, link_, link_protection, 0);
+    };
+    auto CallExtractUInt_IfNotZero = [](cRVecU property, cRVecL link_, cRVecI link_protection) -> RVecU {
+        return ExtractIf<UInt_t>(property, link_, link_protection, 0);
+    };
+
+    RNode df_V0s =
+        df.Define(v0_name + "_TrackEntries_", KF_V0Finder,  //
+                  {neg_name + "_TrackEntry_", pos_name + "_TrackEntry_", "Track_Px", "Track_Py", "Track_Pz", "Track_X", "Track_Y", "Track_Z",
+                   "Track_Charge", "Track_Alpha", "Track_Snp", "Track_Tgl", "Track_Signed1Pt", "Track_CovMatrix", "MagneticField", "Event_KF_PV"})
+            .Define(v0_name + "_Daughters_PdgCode", ExtractVector<Int_t>, {"Track_PdgCode", v0_name + "_TrackEntries_"})
+            .Define(v0_name + "_Daughters_IsSignal", ExtractVector<Int_t>, {"Track_IsSignal", v0_name + "_TrackEntries_"})
+            .Define(v0_name + "_McEntry_", GetTrueV0, {"MC_PdgCode", v0_name + "_TrackEntries_", "Track_McEntry_", "MC_Mother_McEntry_"})
+            .Define(v0_name + "_IsTrue", v0_name + "_McEntry_ != -1")
+            .Define(v0_name + "_IsSignal", CallExtractInt_IfNotZero, {"MC_IsSignal", v0_name + "_McEntry_", v0_name + "_IsTrue"})
+            .Define(v0_name + "_IsSecondary", CallExtractInt_IfNotZero, {"MC_IsSecondary", v0_name + "_McEntry_", v0_name + "_IsTrue"})
+            .Define(v0_name + "_IsHybrid", IsHybrid, {v0_name + "_IsSignal", "MC_IsSignal", v0_name + "_TrackEntries_", "Track_McEntry_"})
+            .Define(v0_name + "_PdgCode", CallExtractInt_IfNotZero, {"MC_PdgCode", v0_name + "_McEntry_", v0_name + "_IsTrue"})
+            .Define(v0_name + "_ReactionID", CallExtractUInt_IfNotZero, {"MC_ReactionID", v0_name + "_McEntry_", v0_name + "_IsTrue"});
+
+    return df_V0s;
 }
 
 /*
  *
  */
-void Manager::CollectTrueInfo_V0(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_hypothesis, Long64_t neg_entry, Long64_t pos_entry,  //
-                                 Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code, Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id,
-                                 Bool_t& is_hybrid) {
-    /* Default values */
-    is_true = kFALSE;
-    mc_idx_v0 = -1;
-    mc_pdg_code = 0;
-    is_secondary = kFALSE;
-    is_signal = kFALSE;
-    reaction_id = -1;
-    is_hybrid = kFALSE;
-    /* Get MC particles linked to tracks */
-    Long64_t Neg_McEntry = GetMcEntryFromTrackEntry(neg_entry);
-    Long64_t Pos_McEntry = GetMcEntryFromTrackEntry(pos_entry);
-    fTree_MC->SetBranchStatus("*", 0);
-    fTree_MC->SetBranchStatus("Idx", 1);
-    fTree_MC->SetBranchStatus("PdgCode", 1);
-    fTree_MC->SetBranchStatus("Idx_Mother", 1);
-    fTree_MC->SetBranchStatus("Generator", 1);
-    fTree_MC->SetBranchStatus("IsSecFromMat", 1);
-    fTree_MC->SetBranchStatus("IsSecFromWeak", 1);
-    fTree_MC->SetBranchStatus("ReactionID", 1);
-    MC_tt MC_Neg, MC_Pos;
-    if (!CopyMCParticle(Neg_McEntry, MC_Neg)) return;
-    if (!CopyMCParticle(Pos_McEntry, MC_Pos)) return;
-    /* Pion Pairs : motherless */
-    if (pdg_hypothesis == 422) {
-        is_true = !MC_Neg.HasMother() && !MC_Pos.HasMother() && MC_Neg.PdgCode == pdg_neg && MC_Pos.PdgCode == pdg_pos;
-        if (is_true) {
-            is_secondary = MC_Neg.IsSecondary() && MC_Pos.IsSecondary();
-            is_signal = MC_Neg.IsFirstGenSignal() && MC_Pos.IsFirstGenSignal() && MC_Neg.ReactionID == MC_Pos.ReactionID;
-            if (is_signal)
-                reaction_id = MC_Neg.ReactionID;
-            else
-                is_hybrid = (MC_Neg.IsFirstGenSignal() && !MC_Pos.IsFirstGenSignal()) || (!MC_Neg.IsFirstGenSignal() && MC_Pos.IsFirstGenSignal());
-        }
-        return;
-    }
-    /* Get mother of MC particles */
-    Bool_t SameMother = MC_Neg.HasMother() && MC_Pos.HasMother() && MC_Neg.Idx_Mother == MC_Pos.Idx_Mother;
-    if (!SameMother) return;
-    Long64_t V0_McEntry = GetMcEntry(MC_Neg.Idx_Mother);
-    MC_tt MC_V0;
-    if (!CopyMCParticle(V0_McEntry, MC_V0)) return;
-    /*  */
-    is_true = MC_Neg.PdgCode == pdg_neg && MC_Pos.PdgCode == pdg_pos && MC_V0.PdgCode == pdg_hypothesis;
-    if (is_true) {
-        mc_idx_v0 = MC_V0.Idx;
-        mc_pdg_code = MC_V0.PdgCode;
-        is_secondary = MC_V0.IsSecondary();
-        is_signal = MC_V0.IsFirstGenSignal();
-        if (is_signal)
-            reaction_id = MC_V0.ReactionID;
-        else
-            is_hybrid = (MC_Neg.IsSignal() && !MC_Pos.IsSignal()) || (!MC_Neg.IsSignal() && MC_Pos.IsSignal());
-    }
-    return;
-}
+// void Manager::CollectTrueInfo_V0(Int_t pdg_neg, Int_t pdg_pos, Int_t pdg_hypothesis, Long64_t neg_entry, Long64_t pos_entry,  //
+//  Bool_t& is_true, Int_t& mc_idx_v0, Int_t& mc_pdg_code, Bool_t& is_secondary, Bool_t& is_signal, Int_t& reaction_id,
+//  Bool_t& is_hybrid) {
+// /* Default values */
+// is_true = kFALSE;
+// mc_idx_v0 = -1;
+// mc_pdg_code = 0;
+// is_secondary = kFALSE;
+// is_signal = kFALSE;
+// reaction_id = -1;
+// is_hybrid = kFALSE;
+// /* Get MC particles linked to tracks */
+// Long64_t Neg_McEntry = GetMcEntryFromTrackEntry(neg_entry);
+// Long64_t Pos_McEntry = GetMcEntryFromTrackEntry(pos_entry);
+// MC_tt MC_Neg, MC_Pos;
+// if (!CopyMCParticle(Neg_McEntry, MC_Neg)) return;
+// if (!CopyMCParticle(Pos_McEntry, MC_Pos)) return;
+// /* Pion Pairs : motherless */
+// if (pdg_hypothesis == 422) {
+// is_true = !MC_Neg.HasMother() && !MC_Pos.HasMother() && MC_Neg.PdgCode == pdg_neg && MC_Pos.PdgCode == pdg_pos;
+// if (is_true) {
+// is_secondary = MC_Neg.IsSecondary() && MC_Pos.IsSecondary();
+// is_signal = MC_Neg.IsFirstGenSignal() && MC_Pos.IsFirstGenSignal() && MC_Neg.ReactionID == MC_Pos.ReactionID;
+// if (is_signal)
+// reaction_id = MC_Neg.ReactionID;
+// else
+// is_hybrid = (MC_Neg.IsFirstGenSignal() && !MC_Pos.IsFirstGenSignal()) || (!MC_Neg.IsFirstGenSignal() && MC_Pos.IsFirstGenSignal());
+// }
+// return;
+// }
+// /* Get mother of MC particles */
+// Bool_t SameMother = MC_Neg.HasMother() && MC_Pos.HasMother() && MC_Neg.Idx_Mother == MC_Pos.Idx_Mother;
+// if (!SameMother) return;
+// Long64_t V0_McEntry = GetMcEntry(MC_Neg.Idx_Mother);
+// MC_tt MC_V0;
+// if (!CopyMCParticle(V0_McEntry, MC_V0)) return;
+// /*  */
+// is_true = MC_Neg.PdgCode == pdg_neg && MC_Pos.PdgCode == pdg_pos && MC_V0.PdgCode == pdg_hypothesis;
+// if (is_true) {
+// mc_idx_v0 = MC_V0.Idx;
+// mc_pdg_code = MC_V0.PdgCode;
+// is_secondary = MC_V0.IsSecondary();
+// is_signal = MC_V0.IsFirstGenSignal();
+// if (is_signal)
+// reaction_id = MC_V0.ReactionID;
+// else
+// is_hybrid = (MC_Neg.IsSignal() && !MC_Pos.IsSignal()) || (!MC_Neg.IsSignal() && MC_Pos.IsSignal());
+// }
+// return;
+// }
 
 /*                */
 /**  Sexaquarks  **/
 /*** ========== ***/
 
 /*
- *
- */
-void Manager::ProcessFindableSexaquarks() {
-    //
-    std::unordered_multiset<Int_t> PdgCodes_Expected = {-2212, 211, -211, 211};
-    /*
-    // PENDING
-    Int_t PdgCode_StruckNucleon = 2112;
-    if (fReactionChannel == "ALK0") {
-        PdgCode_StruckNucleon = 2112;
-        PdgCodes_FinalStateProducts = {-2212, 211, -211, 211};
-    } else if (fReactionChannel == "ALPK") {
-        PdgCodes_FinalStateProducts = {-2212, 211, 321};
-    } else if (fReactionChannel == "ALPKPP") {
-        PdgCodes_FinalStateProducts = {-2212, 211, 321, -211, 211};
-    } else if (fReactionChannel == "PKPKX") {
-        PdgCodes_FinalStateProducts = {321, 321};
-    }
-    */
-
-    fTree_Injected->SetBranchStatus("*", 0);
-    fTree_Injected->SetBranchStatus("ReactionID", 1);
-
-    fTree_MC->SetBranchStatus("*", 0);
-    fTree_MC->SetBranchStatus("PdgCode", 1);
-
-    fTree_Tracks->SetBranchStatus("*", 0);
-    fTree_Tracks->SetBranchStatus("Px", 1);
-    fTree_Tracks->SetBranchStatus("Py", 1);
-    fTree_Tracks->SetBranchStatus("Pz", 1);
-    /* Loop over Injected */
-    for (Long64_t Reaction_Entry = 0; Reaction_Entry < GetN_Injected(); Reaction_Entry++) {
-        if (!ReadInjected(Reaction_Entry)) continue;
-        std::vector<Long64_t> Track_Entries;
-        std::unordered_multiset<Int_t> PdgCodes_Reconstructed;
-        /* Loop over MC */
-        for (Long64_t& MC_Entry : getMcEntries_fromReactionID[Injected.ReactionID]) {
-            if (!ReadMCParticle(MC_Entry)) continue;
-            /* -- Condition: should've been reconstructed */
-            Long64_t Track_Entry = GetTrackEntryFromMcEntry(MC_Entry);
-            if (!ReadTrack(Track_Entry)) continue;
-            Track_Entries.push_back(Track_Entry);
-            PdgCodes_Reconstructed.insert(MC.PdgCode);
-        }
-        /* It should match the expected final state products */
-        if (PdgCodes_Reconstructed != PdgCodes_Expected) continue;
-        /* Loop over Tracks */
-        for (Long64_t& Track_Entry : Track_Entries) {
-            if (!ReadTrack(Track_Entry)) continue;
-            if (!ReadMCParticle(GetMcEntryFromTrackEntry(Track_Entry))) continue;
-            InfoF("ReactionID=%u, PdgCode=%i, Px=%f, Py=%f, Pz=%f",  //
-                  Injected.ReactionID, MC.PdgCode, Track.Px, Track.Py, Track.Pz);
-        }
-    }
-}
-
-/*
  * Using Kalman Filter, reconstruct (anti-)sexaquark candidates via the reaction channel `AntiSexaquark Neutron -> AntiLambda K0S`
  */
 void Manager::KalmanSexaquarkFinder_TypeA(Bool_t anti_channel) {
     //
-    Long64_t GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry;
-    Long64_t GenLambda_Neg_McEntry, GenLambda_Pos_McEntry;
-    Long64_t KaonZeroShort_Neg_TrackEntry, KaonZeroShort_Pos_TrackEntry;
-    Long64_t KaonZeroShort_Neg_McEntry, KaonZeroShort_Pos_McEntry;
-    /* Declare vectors */
-    ROOT::Math::PxPyPzEVector lvGenLambda;
-    ROOT::Math::PxPyPzEVector lvGenLambda_Neg, lvGenLambda_Pos;
-    ROOT::Math::PxPyPzEVector lvKaonZeroShort;
-    ROOT::Math::PxPyPzEVector lvKaonZeroShort_Neg, lvKaonZeroShort_Pos;
-    ROOT::Math::PxPyPzMVector lvStruckNucleon(0., 0., 0., GetMass(2112));
-    ROOT::Math::PxPyPzEVector lvSexaquark;
-    /* Candidate object */
-    UInt_t Counter = 0;
-    Candidate::ChannelA newSexaquark;
-    newSexaquark.SetPrimaryVertex(kfPrimaryVertex);
-    /* Declare KFParticle objects */
-    KFParticle kfKaonZeroShort;
-    KFParticle kfGenLambda;
-    /* Information from MC */
-    Bool_t IsSignal;
-    Int_t ReactionID;
-    Bool_t IsHybrid;
-    Int_t NonCombBkg_PdgCode;
-    /* Choose between `AntiSexaquark Neutron -> AntiLambda K0S` or `Sexaquark AntiNeutron -> Lambda K0S` */
-    std::vector<Candidate::V0>* GenericLambdas = anti_channel ? &Lambdas : &AntiLambdas;
-    TreeName Sexaquarks_TreeName = anti_channel ? TreeName::Sexaquarks_ALK0 : TreeName::Sexaquarks_LK0;
-    /* Loop over (Anti-)Lambda,KaonZeroShort pairs */
-    for (Candidate::V0 Lambda : *GenericLambdas) {
-        for (Candidate::V0 KaonZeroShort : KaonsZeroShort) {
-            /* Get track entries */
-            GenLambda_Neg_TrackEntry = GetTrackEntry(Lambda.EsdIdxNeg);
-            GenLambda_Pos_TrackEntry = GetTrackEntry(Lambda.EsdIdxPos);
-            KaonZeroShort_Neg_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxNeg);
-            KaonZeroShort_Pos_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxPos);
-            /** Sanity check: prevent any track from being repeated **/
-            std::set<Long64_t> unique_indices = {GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry, KaonZeroShort_Neg_TrackEntry,
-                                                 KaonZeroShort_Pos_TrackEntry};
-            if ((Int_t)unique_indices.size() < 4) continue;
-            /** Kalman Filter **/
-            kfGenLambda = Lambda.GetKf();
-            kfKaonZeroShort = KaonZeroShort.GetKf();
-            KFParticle kfSexaquark;
-            kfSexaquark.AddDaughter(kfGenLambda);
-            kfSexaquark.AddDaughter(kfKaonZeroShort);
-            /** Transport V0s to the secondary vertex **/
-            kfSexaquark.TransportToDecayVertex();
-            /** -- PENDING: does this even work? **/
-            kfGenLambda.SetProductionVertex(kfSexaquark);
-            kfGenLambda.TransportToProductionVertex();
-            kfKaonZeroShort.SetProductionVertex(kfSexaquark);
-            kfKaonZeroShort.TransportToProductionVertex();
-            /** Get and transport tracks **/
-            /** -- PENDING: study this further... **/
-            /*
-            kfGenLambda_Neg = Math::TransportKFParticle(kfGenLambda_Neg, kfGenLambda_Pos, GetMass(2212),  //
-                                                        (Int_t)Track_GenLambda_Neg.Charge);
-            kfGenLambda_Pos = Math::TransportKFParticle(kfGenLambda_Pos, kfGenLambda_Neg, GetMass(211),  //
-                                                        (Int_t)Track_GenLambda_Pos.Charge);
-            kfKaonZeroShort_Neg = Math::TransportKFParticle(kfKaonZeroShort_Neg, kfKaonZeroShort_Pos, GetMass(211),  //
-                                                            (Int_t)Track_KaonZeroShort_Neg.Charge);
-            kfKaonZeroShort_Pos = Math::TransportKFParticle(kfKaonZeroShort_Pos, kfKaonZeroShort_Neg, GetMass(211),  //
-                                                            (Int_t)Track_KaonZeroShort_Pos.Charge);
-            lvGenLambda_Neg =  //
-                ROOT::Math::PxPyPzMVector(kfGenLambda_Neg.Px(), kfGenLambda_Neg.Py(), kfGenLambda_Neg.Pz(), GetMass(2212));
-            lvGenLambda_Pos =  //
-                ROOT::Math::PxPyPzMVector(kfGenLambda_Pos.Px(), kfGenLambda_Pos.Py(), kfGenLambda_Pos.Pz(), GetMass(211));
-            lvKaonZeroShort_Neg =
-                ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Neg.Px(), kfKaonZeroShort_Neg.Py(), kfKaonZeroShort_Neg.Pz(), GetMass(211));
-            lvKaonZeroShort_Pos =
-                ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Pos.Px(), kfKaonZeroShort_Pos.Py(), kfKaonZeroShort_Pos.Pz(), GetMass(211));
-            lvGenLambda = lvGenLambda_Neg + lvGenLambda_Pos;
-            lvKaonZeroShort = lvKaonZeroShort_Neg + lvKaonZeroShort_Pos;
-            */
-            /** Reconstruct (anti-)sexaquark candidate **/
-            lvGenLambda = ROOT::Math::PxPyPzEVector(kfGenLambda.Px(), kfGenLambda.Py(), kfGenLambda.Pz(), kfGenLambda.E());
-            lvKaonZeroShort = ROOT::Math::PxPyPzEVector(kfKaonZeroShort.Px(), kfKaonZeroShort.Py(), kfKaonZeroShort.Pz(), kfKaonZeroShort.E());
-            lvSexaquark = lvGenLambda + lvKaonZeroShort - lvStruckNucleon;
-            /** Prepare candidate object **/
-            // newSexaquark.SetSexaquarkInfo(); // PENDING
-            newSexaquark.SetKinematics(lvSexaquark, lvGenLambda, lvKaonZeroShort);
-            newSexaquark.SetGeometry(kfSexaquark, kfGenLambda, kfKaonZeroShort,  //
-                                     Lambda.GetKfNeg(), Lambda.GetKfPos(), KaonZeroShort.GetKfNeg(), KaonZeroShort.GetKfPos());
-            /** Collect true information **/
-            /*
-                if (Settings::IsMC) {
-                CollectTrueInfo_ChannelA(); // PENDING
-                newSexaquark.SetTrueInfo(IsSignal, ReactionID, IsHybrid, NonCombBkg_PdgCode);
-                }
-            */
-            /** Apply cuts **/
-            if (!Inspector.Approve(newSexaquark)) continue;
-            /** Store **/
-            FillSexaquark(Sexaquarks_TreeName, newSexaquark);
-            Counter++;
-        }  // end of loop over K0S
-    }      // end of loop over (anti-)lambdas
-    InfoF("N Found Channel A Candidates: %u", Counter);
+    // Long64_t GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry;
+    // Long64_t GenLambda_Neg_McEntry, GenLambda_Pos_McEntry;
+    // Long64_t KaonZeroShort_Neg_TrackEntry, KaonZeroShort_Pos_TrackEntry;
+    // Long64_t KaonZeroShort_Neg_McEntry, KaonZeroShort_Pos_McEntry;
+    // /* Declare vectors */
+    // ROOT::Math::PxPyPzEVector lvGenLambda;
+    // ROOT::Math::PxPyPzEVector lvGenLambda_Neg, lvGenLambda_Pos;
+    // ROOT::Math::PxPyPzEVector lvKaonZeroShort;
+    // ROOT::Math::PxPyPzEVector lvKaonZeroShort_Neg, lvKaonZeroShort_Pos;
+    // ROOT::Math::PxPyPzMVector lvStruckNucleon(0., 0., 0., GetMass(2112));
+    // ROOT::Math::PxPyPzEVector lvSexaquark;
+    // /* Candidate object */
+    // UInt_t Counter = 0;
+    // Candidate::ChannelA newSexaquark;
+    // newSexaquark.SetPrimaryVertex(kfPrimaryVertex);
+    // /* Declare KFParticle objects */
+    // KFParticle kfKaonZeroShort;
+    // KFParticle kfGenLambda;
+    // /* Information from MC */
+    // Bool_t IsSignal;
+    // Int_t ReactionID;
+    // Bool_t IsHybrid;
+    // Int_t NonCombBkg_PdgCode;
+    // /* Choose between `AntiSexaquark Neutron -> AntiLambda K0S` or `Sexaquark AntiNeutron -> Lambda K0S` */
+    // std::vector<Candidate::V0>* GenericLambdas = anti_channel ? &Lambdas : &AntiLambdas;
+    // TreeName Sexaquarks_TreeName = anti_channel ? TreeName::Sexaquarks_ALK0 : TreeName::Sexaquarks_LK0;
+    // /* Loop over (Anti-)Lambda,KaonZeroShort pairs */
+    // for (Candidate::V0 Lambda : *GenericLambdas) {
+    // for (Candidate::V0 KaonZeroShort : KaonsZeroShort) {
+    // /* Get track entries */
+    // GenLambda_Neg_TrackEntry = GetTrackEntry(Lambda.EsdIdxNeg);
+    // GenLambda_Pos_TrackEntry = GetTrackEntry(Lambda.EsdIdxPos);
+    // KaonZeroShort_Neg_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxNeg);
+    // KaonZeroShort_Pos_TrackEntry = GetTrackEntry(KaonZeroShort.EsdIdxPos);
+    // /** Sanity check: prevent any track from being repeated **/
+    // std::set<Long64_t> unique_indices = {GenLambda_Neg_TrackEntry, GenLambda_Pos_TrackEntry, KaonZeroShort_Neg_TrackEntry,
+    //  KaonZeroShort_Pos_TrackEntry};
+    // if ((Int_t)unique_indices.size() < 4) continue;
+    // /** Kalman Filter **/
+    // kfGenLambda = Lambda.GetKf();
+    // kfKaonZeroShort = KaonZeroShort.GetKf();
+    // KFParticle kfSexaquark;
+    // kfSexaquark.AddDaughter(kfGenLambda);
+    // kfSexaquark.AddDaughter(kfKaonZeroShort);
+    // /** Transport V0s to the secondary vertex **/
+    // kfSexaquark.TransportToDecayVertex();
+    // /** -- PENDING: does this even work? **/
+    // kfGenLambda.SetProductionVertex(kfSexaquark);
+    // kfGenLambda.TransportToProductionVertex();
+    // kfKaonZeroShort.SetProductionVertex(kfSexaquark);
+    // kfKaonZeroShort.TransportToProductionVertex();
+    // /** Get and transport tracks **/
+    // /** -- PENDING: study this further... **/
+    // // kfGenLambda_Neg = Math::TransportKFParticle(kfGenLambda_Neg, kfGenLambda_Pos, GetMass(2212),  //
+    // // (Int_t)Track_GenLambda_Neg.Charge);
+    // // kfGenLambda_Pos = Math::TransportKFParticle(kfGenLambda_Pos, kfGenLambda_Neg, GetMass(211),  //
+    // // (Int_t)Track_GenLambda_Pos.Charge);
+    // // kfKaonZeroShort_Neg = Math::TransportKFParticle(kfKaonZeroShort_Neg, kfKaonZeroShort_Pos, GetMass(211),  //
+    // // (Int_t)Track_KaonZeroShort_Neg.Charge);
+    // // kfKaonZeroShort_Pos = Math::TransportKFParticle(kfKaonZeroShort_Pos, kfKaonZeroShort_Neg, GetMass(211),  //
+    // // (Int_t)Track_KaonZeroShort_Pos.Charge);
+    // // lvGenLambda_Neg =  //
+    // // ROOT::Math::PxPyPzMVector(kfGenLambda_Neg.Px(), kfGenLambda_Neg.Py(), kfGenLambda_Neg.Pz(), GetMass(2212));
+    // // lvGenLambda_Pos =  //
+    // // ROOT::Math::PxPyPzMVector(kfGenLambda_Pos.Px(), kfGenLambda_Pos.Py(), kfGenLambda_Pos.Pz(), GetMass(211));
+    // // lvKaonZeroShort_Neg =
+    // // ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Neg.Px(), kfKaonZeroShort_Neg.Py(), kfKaonZeroShort_Neg.Pz(), GetMass(211));
+    // // lvKaonZeroShort_Pos =
+    // // ROOT::Math::PxPyPzMVector(kfKaonZeroShort_Pos.Px(), kfKaonZeroShort_Pos.Py(), kfKaonZeroShort_Pos.Pz(), GetMass(211));
+    // // lvGenLambda = lvGenLambda_Neg + lvGenLambda_Pos;
+    // // lvKaonZeroShort = lvKaonZeroShort_Neg + lvKaonZeroShort_Pos;
+    // /** Reconstruct (anti-)sexaquark candidate **/
+    // lvGenLambda = ROOT::Math::PxPyPzEVector(kfGenLambda.Px(), kfGenLambda.Py(), kfGenLambda.Pz(), kfGenLambda.E());
+    // lvKaonZeroShort = ROOT::Math::PxPyPzEVector(kfKaonZeroShort.Px(), kfKaonZeroShort.Py(), kfKaonZeroShort.Pz(), kfKaonZeroShort.E());
+    // lvSexaquark = lvGenLambda + lvKaonZeroShort - lvStruckNucleon;
+    // /** Prepare candidate object **/
+    // // newSexaquark.SetSexaquarkInfo(); // PENDING
+    // newSexaquark.SetKinematics(lvSexaquark, lvGenLambda, lvKaonZeroShort);
+    // newSexaquark.SetGeometry(kfSexaquark, kfGenLambda, kfKaonZeroShort,  //
+    //  Lambda.GetKfNeg(), Lambda.GetKfPos(), KaonZeroShort.GetKfNeg(), KaonZeroShort.GetKfPos());
+    // /** Collect true information **/
+    // /*
+    // if (Settings::IsMC) {
+    // CollectTrueInfo_ChannelA(); // PENDING
+    // newSexaquark.SetTrueInfo(IsSignal, ReactionID, IsHybrid, NonCombBkg_PdgCode);
+    // }
+    // */
+    // /** Apply cuts **/
+    // if (!Inspector.Approve(newSexaquark)) continue;
+    // /** Store **/
+    // FillSexaquark(Sexaquarks_TreeName, newSexaquark);
+    // Counter++;
+    // }  // end of loop over K0S
+    // }      // end of loop over (anti-)lambdas
+    // InfoF("N Found Channel A Candidates: %u", Counter);
 }
 
-/*
- *
- */
 void Manager::KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel) {
     //
 }
@@ -661,71 +657,243 @@ void Manager::CollectTrueInfo_ChannelH() {
     //
 }
 
-/*               */
-/**  Utilities  **/
-/*** ========= ***/
+/*           */
+/* Utilities */
+/* ========= */
 
-/*
- *
- */
-void Manager::CleanContainers() {
-    //
-    getMcIdx_FromMcEntry.clear();
-    getMcEntry_fromMcIdx.clear();
-    mcEntriesOfTrueV0s.clear();
-    getMcIdxNeg_fromMcIdx.clear();
-    getMcIdxPos_fromMcIdx.clear();
-    getMcEntries_fromReactionID.clear();
-    //
-    getTrackEntry_fromEsdIdx.clear();
-    getEsdIdx_fromTrackEntry.clear();
-    getMcIdx_fromEsdIdx.clear();
-    getEsdIdx_fromMcIdx.clear();
-    //
-    TrackEntries_AntiProton.clear();
-    TrackEntries_Proton.clear();
-    TrackEntries_NegKaon.clear();
-    TrackEntries_PosKaon.clear();
-    TrackEntries_PiMinus.clear();
-    TrackEntries_PiPlus.clear();
-    //
-    AntiLambdas.clear();
-    Lambdas.clear();
-    KaonsZeroShort.clear();
-    PionPairs.clear();
+void Manager::PrintAll(RNode df) {
+    /* # MC */
+    auto n_mc = df.Take<size_t>("N_MC").GetValue();
+    auto ev_mc_pdgcode = df.Take<RVecI>("MC_PdgCode").GetValue();
+    auto ev_mc_is_charged = df.Take<RVecI>("MC_IsProtonKaonPion").GetValue();
+    auto ev_mc_is_signal = df.Take<RVecI>("MC_IsSignal").GetValue();
+    auto ev_mc_xv = df.Take<RVecF>("MC_Xv").GetValue();
+    /* -- Mother */
+    auto ev_mc_mother_entry = df.Take<RVecL>("MC_Mother_McEntry_").GetValue();
+    auto ev_mc_mother_pdgcode = df.Take<RVecI>("MC_Mother_PdgCode").GetValue();
+    /* -- Daughter */
+    auto ev_mc_neg_entry = df.Take<RVecL>("MC_NegDau_McEntry_").GetValue();
+    auto ev_mc_pos_entry = df.Take<RVecL>("MC_PosDau_McEntry_").GetValue();
+    auto ev_mc_neg_pdgcode = df.Take<RVecI>("MC_NegDau_PdgCode").GetValue();
+    auto ev_mc_pos_pdgcode = df.Take<RVecI>("MC_PosDau_PdgCode").GetValue();
+    /* -- Ancestor */
+    auto ev_mc_ancestor_entry = df.Take<RVecL>("MC_Ancestor_McEntry_").GetValue();
+    auto ev_mc_reaction_id = df.Take<RVecU>("MC_ReactionID").GetValue();
+    /* -- Linked Info */
+    auto ev_mc_got_tracked = df.Take<RVecI>("MC_GotTracked").GetValue();
+    auto ev_mc_neg_gottracked = df.Take<RVecI>("MC_NegDau_GotTracked").GetValue();
+    auto ev_mc_pos_gottracked = df.Take<RVecI>("MC_PosDau_GotTracked").GetValue();
+    auto ev_mc_truev0_isfindable = df.Take<RVecI>("MC_TrueV0_IsFindable").GetValue();
+    /* # Injected */
+    auto n_injected = df.Take<ULong_t>("N_Injected").GetValue();
+    auto ev_injected_reaction_id = df.Take<RVecU>("ReactionID").GetValue();
+    auto ev_injected_mc_entries = df.Take<RVec<RVecUL>>("Injected_Products_McEntries_").GetValue();
+    auto ev_injected_mc_pdgcode = df.Take<RVec<RVecI>>("Injected_Products_PdgCode").GetValue();
+    auto ev_injected_radius = df.Take<RVecF>("Injected_Radius").GetValue();
+    auto ev_injected_pt_after_reaction = df.Take<RVecF>("Injected_Pt_AfterReaction").GetValue();
+    auto ev_injected_is_findable = df.Take<RVecI>("Injected_IsFindable").GetValue();
+    /* # Tracks*/
+    auto n_tracks = df.Take<ULong_t>("N_Tracks").GetValue();
+    auto ev_track_mc_entry = df.Take<RVecUL>("Track_McEntry").GetValue();
+    auto ev_track_nsigmaproton = df.Take<RVecF>("Track_NSigmaProton").GetValue();
+    auto ev_track_nsigmapion = df.Take<RVecF>("Track_NSigmaPion").GetValue();
+    auto ev_track_pid_as_antiproton = df.Take<RVecI>("Track_PID_AsAntiProton").GetValue();
+    auto ev_track_pid_as_piminus = df.Take<RVecI>("Track_PID_AsPiMinus").GetValue();
+    auto ev_track_pid_as_piplus = df.Take<RVecI>("Track_PID_AsPiPlus").GetValue();
+    auto ev_track_pdgcode = df.Take<RVecI>("Track_PdgCode").GetValue();
+    auto ev_track_issignal = df.Take<RVecI>("Track_IsSignal").GetValue();
+    /* # Found V0s */
+    /* -- AntiLambdas */
+    auto ev_found_antilambdas = df.Take<RVec<RVecUL>>("AntiLambdas_TrackEntries_").GetValue();
+    auto ev_found_antilambdas_pdgcodes = df.Take<RVec<RVecI>>("AntiLambdas_Daughters_PdgCode").GetValue();
+    auto ev_found_antilambdas_mc_entry = df.Take<RVecL>("AntiLambdas_McEntry_").GetValue();
+    auto ev_found_antilambdas_istrue = df.Take<RVecI>("AntiLambdas_IsTrue").GetValue();
+    auto ev_found_antilambdas_issignal = df.Take<RVecI>("AntiLambdas_IsSignal").GetValue();
+    auto ev_found_antilambdas_issecondary = df.Take<RVecI>("AntiLambdas_IsSecondary").GetValue();
+    auto ev_found_antilambdas_ishybrid = df.Take<RVecI>("AntiLambdas_IsHybrid").GetValue();
+    auto ev_found_antilambdas_mc_pdgcode = df.Take<RVecI>("AntiLambdas_PdgCode").GetValue();
+    auto ev_found_antilambdas_reaction_id = df.Take<RVecU>("AntiLambdas_ReactionID").GetValue();
+    /* -- Lambdas */
+    /*
+    auto ev_found_lambdas = df.Take<RVec<RVecUL>>("Lambdas_TrackEntries_").GetValue();
+    auto ev_found_lambdas_pdgcodes = df.Take<RVec<RVecI>>("Lambdas_Daughters_PdgCode").GetValue();
+    auto ev_found_lambdas_mc_entry = df.Take<RVecL>("Lambdas_McEntry_").GetValue();
+    auto ev_found_lambdas_istrue = df.Take<RVecI>("Lambdas_IsTrue").GetValue();
+    auto ev_found_lambdas_issignal = df.Take<RVecI>("Lambdas_IsSignal").GetValue();
+    auto ev_found_lambdas_issecondary = df.Take<RVecI>("Lambdas_IsSecondary").GetValue();
+    auto ev_found_lambdas_ishybrid = df.Take<RVecI>("Lambdas_IsHybrid").GetValue();
+    auto ev_found_lambdas_mc_pdgcode = df.Take<RVecI>("Lambdas_PdgCode").GetValue();
+    auto ev_found_lambdas_reaction_id = df.Take<RVecU>("Lambdas_ReactionID").GetValue();
+    */
+    /* -- KaonsZeroShort */
+    /*
+    auto ev_found_k0s = df.Take<RVec<RVecUL>>("KaonsZeroShort_TrackEntries_").GetValue();
+    auto ev_found_k0s_pdgcodes = df.Take<RVec<RVecI>>("KaonsZeroShort_Daughters_PdgCode").GetValue();
+    auto ev_found_k0s_mc_entry = df.Take<RVecL>("KaonsZeroShort_McEntry_").GetValue();
+    auto ev_found_k0s_istrue = df.Take<RVecI>("KaonsZeroShort_IsTrue").GetValue();
+    auto ev_found_k0s_issignal = df.Take<RVecI>("KaonsZeroShort_IsSignal").GetValue();
+    auto ev_found_k0s_issecondary = df.Take<RVecI>("KaonsZeroShort_IsSecondary").GetValue();
+    auto ev_found_k0s_ishybrid = df.Take<RVecI>("KaonsZeroShort_IsHybrid").GetValue();
+    auto ev_found_k0s_mc_pdgcode = df.Take<RVecI>("KaonsZeroShort_PdgCode").GetValue();
+    auto ev_found_k0s_reaction_id = df.Take<RVecU>("KaonsZeroShort_ReactionID").GetValue();
+    */
+    /* # Sexaquarks */
+    /* -- Channel A */
+    /*
+    auto ev_found_channel_a = df.Take<RVec<RVecUL>>("ChannelA_V0Entries_").GetValue();
+    auto ev_found_channel_a_issignal = df.Take<RVecI>("ChannelA_IsSignal").GetValue();
+    */
+    // --- //
+    size_t n_events = n_mc.size();
+    for (size_t event_i = 0; event_i < n_events; event_i++) {
+        std::cout << "# Event " << event_i << std::endl;
+        // --- //
+        std::cout << "## Summary" << std::endl;
+        printf(">> N Injected = %lu\n", n_injected[event_i]);
+        printf(">> N Findable Sexaquarks = %d\n", Sum(ev_injected_is_findable[event_i]));
+        printf(">> N MC = %lu\n", n_mc[event_i]);
+        printf(">> N Findable V0s = %d\n", Sum(ev_mc_truev0_isfindable[event_i]));
+
+        printf(">> N Found AntiLambdas = %lu\n", ev_found_antilambdas[event_i].size());
+        printf(">> N Found AntiLambdas (True) = %d\n", Sum(ev_found_antilambdas_istrue[event_i]));
+        printf(">> N Found AntiLambdas (Signal) = %d\n", Sum(ev_found_antilambdas_issignal[event_i]));
+        printf(">> N Found AntiLambdas (Secondary) = %d\n", Sum(ev_found_antilambdas_issecondary[event_i]));
+        printf(">> N Found AntiLambdas (Hybrid) = %d\n", Sum(ev_found_antilambdas_ishybrid[event_i]));
+        // printf(">> N Found Lambdas = %lu\n", ev_found_lambdas[event_i].size());
+        // printf(">> N Found Lambdas (True) = %d\n", Sum(ev_found_lambdas_istrue[event_i]));
+        // printf(">> N Found Lambdas (Signal) = %d\n", Sum(ev_found_lambdas_issignal[event_i]));
+        // printf(">> N Found Lambdas (Secondary) = %d\n", Sum(ev_found_lambdas_issecondary[event_i]));
+        // printf(">> N Found KaonsZeroShort = %lu\n", ev_found_k0s[event_i].size());
+        // printf(">> N Found KaonsZeroShort (True) = %d\n", Sum(ev_found_k0s_istrue[event_i]));
+        // printf(">> N Found KaonsZeroShort (Signal) = %d\n", Sum(ev_found_k0s_issignal[event_i]));
+        // printf(">> N Found KaonsZeroShort (Secondary) = %d\n", Sum(ev_found_k0s_issecondary[event_i]));
+        /*
+        printf(">> N Found AntiSexaquarks (Channel A) = %lu\n", ev_found_channel_a[event_i].size());
+        printf(">> N Found AntiSexaquarks (Channel A, Signal) = %d\n", Sum(ev_found_channel_a_issignal[event_i]));
+        */
+        // --- //
+        /*
+                std::cout << "## (MC) Particles" << std::endl;
+                for (size_t mc_entry = 0; mc_entry < n_mc[event_i]; mc_entry++) {
+                    printf("mc_entry=%lu, pdg_code=%d, ancestor_entry=%ld, mother_entry=%ld, neg_entry=%ld, pos_entry=%ld\n",  //
+                           mc_entry, ev_mc_pdgcode[event_i][mc_entry], ev_mc_ancestor_entry[event_i][mc_entry], ev_mc_mother_entry[event_i][mc_entry],
+                           ev_mc_neg_entry[event_i][mc_entry], ev_mc_pos_entry[event_i][mc_entry]);
+                }
+         */
+        // --- //
+
+        std::cout << "## (MC) V0s" << std::endl;
+        for (size_t mc_entry = 0; mc_entry < n_mc[event_i]; mc_entry++) {
+            if (!(ev_mc_pdgcode[event_i][mc_entry] == 310 || TMath::Abs(ev_mc_pdgcode[event_i][mc_entry]) == 3122)) continue;
+            printf("mc_entry=%lu, pdg_code=%d, is_signal=%d, neg_entry=%ld, pos_entry=%ld, neg_gt=%d, pos_gt=%d, neg_pdg=%d, pos_pdg=%d, xv=%f\n",  //
+                   mc_entry, ev_mc_pdgcode[event_i][mc_entry], ev_mc_is_signal[event_i][mc_entry], ev_mc_neg_entry[event_i][mc_entry],
+                   ev_mc_pos_entry[event_i][mc_entry], ev_mc_neg_gottracked[event_i][mc_entry], ev_mc_pos_gottracked[event_i][mc_entry],
+                   ev_mc_neg_pdgcode[event_i][mc_entry], ev_mc_pos_pdgcode[event_i][mc_entry], ev_mc_xv[event_i][mc_entry]);
+        }
+
+        // --- //
+
+        std::cout << "## (MC) Charged Particles" << std::endl;
+        for (size_t mc_entry = 0; mc_entry < n_mc[event_i]; mc_entry++) {
+            if (!ev_mc_is_charged[event_i][mc_entry]) continue;
+            printf("mc_entry=%ld, pdg_code=%d, is_signal=%d, mother_entry=%ld, mother_pdg=%d, got_tracked=%d\n",  //
+                   mc_entry, ev_mc_pdgcode[event_i][mc_entry], ev_mc_is_signal[event_i][mc_entry], ev_mc_mother_entry[event_i][mc_entry],
+                   ev_mc_mother_pdgcode[event_i][mc_entry], ev_mc_got_tracked[event_i][mc_entry]);
+        }
+
+        // --- //
+
+        std::cout << "## Injected" << std::endl;
+        for (size_t inj_entry = 0; inj_entry < n_injected[event_i]; inj_entry++) {
+            printf("reaction_id=%d, radius=%f, pt_after_reaction=%f, is_findable=%d\n",  //
+                   ev_injected_reaction_id[event_i][inj_entry], ev_injected_radius[event_i][inj_entry],
+                   ev_injected_pt_after_reaction[event_i][inj_entry], ev_injected_is_findable[event_i][inj_entry]);
+            for (size_t prod_entry = 0; prod_entry < ev_injected_mc_entries[event_i][inj_entry].size(); prod_entry++) {
+                printf(">> prod_entry=%lu, pdg_code=%d\n",  //
+                       ev_injected_mc_entries[event_i][inj_entry][prod_entry], ev_injected_mc_pdgcode[event_i][inj_entry][prod_entry]);
+            }
+        }
+
+        // --- //
+
+        std::cout << "## Tracks" << std::endl;
+        for (size_t track_entry = 0; track_entry < n_tracks[event_i]; track_entry++) {
+            printf("track_entry=%ld, mc_entry=%lu, nsigmaproton=%f, nsigmapion=%f, pdg_code=%d, is_signal=%d\n",  //
+                   track_entry, ev_track_mc_entry[event_i][track_entry], ev_track_nsigmaproton[event_i][track_entry],
+                   ev_track_nsigmapion[event_i][track_entry], ev_track_pdgcode[event_i][track_entry], ev_track_issignal[event_i][track_entry]);
+        }
+
+        // --- //
+
+        std::cout << "## V0s" << std::endl;
+
+        // --- //
+        std::cout << "## >> (Found) AntiLambdas" << std::endl;
+        for (size_t v0_entry = 0; v0_entry < ev_found_antilambdas[event_i].size(); v0_entry++) {
+            printf(
+                "v0_entry=%lu, neg=%lu, pos=%lu, neg_pdg=%d, pos_pdg=%d, is_true=%d, is_signal=%d, is_secondary=%d, is_hybrid=%d, mc_entry=%ld, "
+                "mc_pdg_code=%d, reaction_id=%d\n",
+                v0_entry, ev_found_antilambdas[event_i][v0_entry][0], ev_found_antilambdas[event_i][v0_entry][1],
+                ev_found_antilambdas_pdgcodes[event_i][v0_entry][0], ev_found_antilambdas_pdgcodes[event_i][v0_entry][1],
+                ev_found_antilambdas_istrue[event_i][v0_entry], ev_found_antilambdas_issignal[event_i][v0_entry],
+                ev_found_antilambdas_issecondary[event_i][v0_entry], ev_found_antilambdas_ishybrid[event_i][v0_entry],
+                ev_found_antilambdas_mc_entry[event_i][v0_entry], ev_found_antilambdas_mc_pdgcode[event_i][v0_entry],
+                ev_found_antilambdas_reaction_id[event_i][v0_entry]);
+        }
+        /*
+        std::cout << "## >> (Found) Lambdas" << std::endl;
+        for (size_t v0_entry = 0; v0_entry < ev_found_lambdas[event_i].size(); v0_entry++) {
+            printf(
+                "v0_entry=%lu, neg=%lu, pos=%lu, neg_pdg=%d, pos_pdg=%d, is_true=%d, is_signal=%d, is_secondary=%d, is_hybrid=%d, mc_entry=%ld, "
+                "mc_pdg_code=%d, reaction_id=%d\n",
+                v0_entry, ev_found_lambdas[event_i][v0_entry][0], ev_found_lambdas[event_i][v0_entry][1],
+                ev_found_lambdas_pdgcodes[event_i][v0_entry][0], ev_found_lambdas_pdgcodes[event_i][v0_entry][1],
+                ev_found_lambdas_istrue[event_i][v0_entry], ev_found_lambdas_issignal[event_i][v0_entry],
+                ev_found_lambdas_issecondary[event_i][v0_entry], ev_found_lambdas_ishybrid[event_i][v0_entry],
+                ev_found_lambdas_mc_entry[event_i][v0_entry], ev_found_lambdas_mc_pdgcode[event_i][v0_entry],
+                ev_found_lambdas_reaction_id[event_i][v0_entry]);
+        }
+        std::cout << "## >> (Found) KaonsZeroShort" << std::endl;
+        for (size_t v0_entry = 0; v0_entry < ev_found_k0s[event_i].size(); v0_entry++) {
+            printf(
+                "v0_entry=%lu, neg=%lu, pos=%lu, neg_pdg=%d, pos_pdg=%d, is_true=%d, is_signal=%d, is_secondary=%d, is_hybrid=%d, mc_entry=%ld, "
+                "mc_pdg_code=%d, reaction_id=%d\n",
+                v0_entry, ev_found_k0s[event_i][v0_entry][0], ev_found_k0s[event_i][v0_entry][1], ev_found_k0s_pdgcodes[event_i][v0_entry][0],
+                ev_found_k0s_pdgcodes[event_i][v0_entry][1], ev_found_k0s_istrue[event_i][v0_entry], ev_found_k0s_issignal[event_i][v0_entry],
+                ev_found_k0s_issecondary[event_i][v0_entry], ev_found_k0s_ishybrid[event_i][v0_entry], ev_found_k0s_mc_entry[event_i][v0_entry],
+                ev_found_k0s_mc_pdgcode[event_i][v0_entry], ev_found_k0s_reaction_id[event_i][v0_entry]);
+        }
+        */
+        // --- //
+        /*
+        std::cout << "## Sexaquarks" << std::endl;
+        */
+        // --- //
+        /*
+        std::cout << "## (Found) AntiSexaquarks (Channel A)" << std::endl;
+        for (size_t sexa_entry = 0; sexa_entry < ev_found_channel_a[event_i].size(); sexa_entry++) {
+            printf("v0a_entry=%lu, v0b_entry=%lu, is_signal=%d\n", ev_found_channel_a[event_i][sexa_entry][0],
+                    ev_found_channel_a[event_i][sexa_entry][1], ev_found_channel_a_issignal[event_i][sexa_entry]);
+        }
+        */
+    }
 }
 
-/*
- *
- */
-void Manager::EndOfEvent() {
-    //
-    DisconnectInjectedBranches();
-    DisconnectMCBranches();
-    DisconnectTracksBranches();
-    CleanContainers();
-}
-
-/*
- *
- */
 void Manager::EndOfAnalysis() {
     //
-    DisconnectEventBranches();
-    //
-    if (OutputFile) {
-        OutputFile->cd();
-        WriteTree(TreeName::V0s);
-        WriteTree(TreeName::Sexaquarks_ALK0);
-        // WriteTree(TreeName::Sexaquarks_ALPK);
-        // WriteTree(TreeName::Sexaquarks_ALPKPP);
-        // WriteTree(TreeName::Sexaquarks_PKPKX);
-        // WriteTree(TreeName::Sexaquarks_LK0);
-        // WriteTree(TreeName::Sexaquarks_LNK);
-        // WriteTree(TreeName::Sexaquarks_LNKPP);
-        // WriteTree(TreeName::Sexaquarks_NKNKX);
-        OutputFile->Write();
-    }
+    // if (OutputFile) {
+    // OutputFile->cd();
+    // WriteTree(TreeName::V0s);
+    // WriteTree(TreeName::Sexaquarks_ALK0);
+    // WriteTree(TreeName::Sexaquarks_ALPK);
+    // WriteTree(TreeName::Sexaquarks_ALPKPP);
+    // WriteTree(TreeName::Sexaquarks_PKPKX);
+    // WriteTree(TreeName::Sexaquarks_LK0);
+    // WriteTree(TreeName::Sexaquarks_LNK);
+    // WriteTree(TreeName::Sexaquarks_LNKPP);
+    // WriteTree(TreeName::Sexaquarks_NKNKX);
+    // OutputFile->Write();
+    // }
 }
 
 }  // namespace Analysis

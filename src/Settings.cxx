@@ -3,26 +3,21 @@
 namespace Tree2Sexaquark {
 namespace Analysis {
 
-// Define the static member variables
+/* default values */
 std::string Settings::PathInputFile = "";
 std::string Settings::PathOutputFile = "";
 bool Settings::IsMC = false;
 bool Settings::IsSignalMC = false;
-long long Settings::LimitToNEvents = 0;
+unsigned long Settings::LimitToNEvents = 0;
+unsigned int Settings::NThreads = 1;
 
 Settings* Settings::Instance = nullptr;
 
-/*
- *
- */
 Settings* Settings::GetInstance() {
     if (!Instance) Instance = new Settings();
     return Instance;
 }
 
-/*
- *
- */
 void Settings::DeleteInstance() {
     if (!Instance) {
         delete Instance;

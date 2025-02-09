@@ -4,9 +4,8 @@ target_link_libraries(App
   PRIVATE
     Manager
     KalmanFilter
-    Reader
-    Writer
-    Inspector
+    # Writer
+    # Inspector
     Parser
     Settings
     Common

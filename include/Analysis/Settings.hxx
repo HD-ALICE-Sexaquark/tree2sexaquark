@@ -23,13 +23,15 @@ class Settings {
         InfoF("IsSignalMC     = %i", IsSignalMC);
         InfoF("InputFile      = %s", PathInputFile.c_str());
         InfoF("OutputFile     = %s", PathOutputFile.c_str());
-        InfoF("LimitToNEvents = %lld", LimitToNEvents);
+        InfoF("LimitToNEvents = %lu", LimitToNEvents);
+        InfoF("NThreads       = %u", NThreads);
     }
     static std::string PathInputFile;
     static std::string PathOutputFile;
     static bool IsMC;
     static bool IsSignalMC;
-    static long long LimitToNEvents;
+    static unsigned long LimitToNEvents;
+    static unsigned int NThreads;
 
    private:
     Settings() = default;

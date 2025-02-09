@@ -1,5 +1,7 @@
 #include "Analysis/Manager.hxx"
+#include "Analysis/Settings.hxx"
 #include "Utilities/Parser.hxx"
+#include <TROOT.h>
 
 using namespace Tree2Sexaquark;
 
@@ -9,46 +11,44 @@ int main(int argc, char *argv[]) {
     Analysis::Settings *SettingsInstance = Analysis::Settings::GetInstance();
 
     std::unique_ptr<Parser> ParserInstance =
-        std::make_unique<Parser>("Tree2Sexaquark -- Read SimpleTrees.root and create Sexaquark Analysis Results!");
+        std::make_unique<Parser>("Tree2Sexaquark -- Read AnalysisResults.root and create Sexaquark Analysis Results!");
     ParserInstance->Parse(argc, argv);
     if (ParserInstance->HelpOrError) return ParserInstance->ExitCode;
 
     Analysis::Settings::Print();
 
     std::unique_ptr<Analysis::Manager> ThisAnalysis = std::make_unique<Analysis::Manager>();
-    if (!ThisAnalysis->OpenInputFile()) return 1;
-    if (!ThisAnalysis->PrepareOutputFile()) return 1;
-
-    for (Long64_t evt_entry = 0; evt_entry < ThisAnalysis->GetN_Events(); evt_entry++) {
-        if (!ThisAnalysis->GetEvent(evt_entry)) continue;
-        if (Analysis::Settings::IsMC) {
-            if (Analysis::Settings::IsSignalMC) ThisAnalysis->ProcessInjected();
-            ThisAnalysis->ProcessMCParticles();
-        }
-        /* Tracks */
-        ThisAnalysis->ProcessTracks();
-        /* Findables */
-        if (Analysis::Settings::IsMC) {
-            ThisAnalysis->ProcessFindableV0s();
-            if (Analysis::Settings::IsSignalMC) ThisAnalysis->ProcessFindableSexaquarks();
-        }
-        /* V0s */
-        ThisAnalysis->KalmanV0Finder(-2212, 211, -3122);
-        ThisAnalysis->KalmanV0Finder(-211, 2212, 3122);
-        ThisAnalysis->KalmanV0Finder(-211, 211, 310);
-        ThisAnalysis->KalmanV0Finder(-211, 211, 422);
-        /* Sexaquarks */
-        /*
-        ThisAnalysis->KalmanSexaquarkFinder(2112, {-3122, 310});              // `AntiSexaquark,Neutron -> AntiLambda,K0S`
-        ThisAnalysis->KalmanSexaquarkFinder(-2112, {3122, 310});              // `Sexaquark,AntiNeutron -> Lambda,K0S`
-        ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
-        ThisAnalysis->KalmanSexaquarkFinder(-2212, {3122, -321, -211, 211});  // `Sexaquark,AntiProton -> Lambda,K-,(pi-,pi+)`
-        ThisAnalysis->KalmanSexaquarkFinder(2212, {321, 321});                // `AntiSexaquark,Proton -> K+,K+,X`
-        ThisAnalysis->KalmanSexaquarkFinder(-2212, {-321, -321});             // `Sexaquark,AntiProton -> K-,K-,X`
-        */
-        /* End of Event */
-        ThisAnalysis->EndOfEvent();
-    }  // end of loop over events
+    ThisAnalysis->Init();
+    // if (!ThisAnalysis->PrepareOutputFile()) return 1;
+    /* Open Input File */
+    RDataFrame DF_Input("Events", Analysis::Settings::PathInputFile);
+    /* Start */
+    RNode DF_Main = DF_Input;
+    if (Analysis::Settings::LimitToNEvents) DF_Main = DF_Input.Range(Analysis::Settings::LimitToNEvents);
+    /* Events */
+    DF_Main = ThisAnalysis->ProcessEvent(DF_Main);
+    /* MC */
+    if (Analysis::Settings::IsMC) {
+        DF_Main = ThisAnalysis->ProcessMCParticles(DF_Main);
+        if (Analysis::Settings::IsSignalMC) DF_Main = ThisAnalysis->ProcessInjected(DF_Main);
+    }
+    /* Tracks */
+    DF_Main = ThisAnalysis->ProcessTracks(DF_Main);
+    /* V0s */
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);
+    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 3122, -211, 2212);
+    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);
+    // ThisAnalysis->KalmanV0Finder(-211, 211, 422);
+    /* Sexaquarks */
+    // ThisAnalysis->KalmanSexaquarkFinder(2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    /*
+    ThisAnalysis->KalmanSexaquarkFinder(-2112, {3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
+    ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
+    ThisAnalysis->KalmanSexaquarkFinder(-2212, {3122, -321, -211, 211});  // `Sexaquark,AntiProton -> Lambda,K-,(pi-,pi+)`
+    ThisAnalysis->KalmanSexaquarkFinder(2212, {321, 321});                // `AntiSexaquark,Proton -> K+,K+,X`
+    ThisAnalysis->KalmanSexaquarkFinder(-2212, {-321, -321});             // `Sexaquark,AntiProton -> K-,K-,X`
+    */
+    ThisAnalysis->PrintAll(DF_Main);
     ThisAnalysis->EndOfAnalysis();
 
     Analysis::Settings::DeleteInstance();

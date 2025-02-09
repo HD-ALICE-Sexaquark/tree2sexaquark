@@ -7,12 +7,11 @@
 #include "KFParticle.h"
 #include "KFVertex.h"
 
-#include "Trees/Input.hxx"
-
 namespace Tree2Sexaquark {
 namespace Math {
 
-KFParticle CreateKFParticle(Track_tt track, Double_t mass);
+KFParticle CreateKFParticle(Float_t px, Float_t py, Float_t pz, Float_t x, Float_t y, Float_t z, Int_t charge,  //
+                            Float_t alpha, Float_t snp, Float_t tgl, Float_t signed1pt, Float_t* cov_matrix, Double_t mass);
 KFVertex CreateKFVertex(Float_t* xyz, Float_t* cov_matrix);
 KFParticle TransportKFParticle(KFParticle kf_this, KFParticle kf_other, Double_t mass_this, Int_t charge_this);
 

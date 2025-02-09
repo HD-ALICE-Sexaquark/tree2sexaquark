@@ -14,28 +14,21 @@ target_include_directories(KalmanFilter
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
 
-add_library(Reader STATIC Reader.cxx)
-target_include_directories(Reader
-  PUBLIC
-    ${ROOT_INCLUDE_DIRS}
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-)
+# add_library(Writer STATIC Writer.cxx)
+# target_include_directories(Writer
+  # PUBLIC
+    # ${ROOT_INCLUDE_DIRS}
+    # ${KFParticle_INCLUDE_DIR}
+    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+# )
 
-add_library(Writer STATIC Writer.cxx)
-target_include_directories(Writer
-  PUBLIC
-    ${ROOT_INCLUDE_DIRS}
-    ${KFParticle_INCLUDE_DIR}
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-)
-
-add_library(Inspector STATIC Inspector.cxx)
-target_include_directories(Inspector
-  PUBLIC
-    ${ROOT_INCLUDE_DIRS}
-    ${KFParticle_INCLUDE_DIR}
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-)
+# add_library(Inspector STATIC Inspector.cxx)
+# target_include_directories(Inspector
+  # PUBLIC
+    # ${ROOT_INCLUDE_DIRS}
+    # ${KFParticle_INCLUDE_DIR}
+    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+# )
 
 add_library(Parser STATIC Parser.cxx)
 target_include_directories(Parser

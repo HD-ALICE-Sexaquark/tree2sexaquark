@@ -1,6 +1,7 @@
 #include "Utilities/Parser.hxx"
 
 #include "Analysis/Settings.hxx"
+#include "Utilities/CL1.hpp"
 
 namespace Tree2Sexaquark {
 
@@ -37,7 +38,11 @@ void Parser::AddOptions() {
     CLI_APP.add_flag("-s,--signal", Analysis::Settings::IsSignalMC, "Flag to process Signal MC");
     CLI_APP
         .add_option("-n,--nevents", Analysis::Settings::LimitToNEvents, "Limit to N events")  //
-        ->check(CLI::NonNegativeNumber & CLI::TypeValidator<unsigned int>());
+        ->check(CLI::NonNegativeNumber & CLI::TypeValidator<unsigned long>());
+    CLI_APP
+        .add_option("-j,--nthreads", Analysis::Settings::NThreads, "Number of threads")  //
+        ->check(CLI::PositiveNumber & CLI::TypeValidator<unsigned int>())
+        ->excludes("-n");
 }
 
 /*
