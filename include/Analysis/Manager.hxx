@@ -1,6 +1,7 @@
 #ifndef T2S_ANALYSIS_MANAGER_HXX
 #define T2S_ANALYSIS_MANAGER_HXX
 
+#include "ROOT/RResultPtr.hxx"
 #include "RtypesCore.h"
 #include "TDatabasePDG.h"
 #include "TDirectoryFile.h"
@@ -13,8 +14,8 @@
 #include "ROOT/RDataFrame.hxx"
 #include "ROOT/RVec.hxx"
 
-#include "Math/Point3Dfwd.h"
-#include "Math/Vector4Dfwd.h"
+#include "Math/Point3D.h"
+#include "Math/Vector4D.h"
 
 #ifndef HomogeneousField
 #define HomogeneousField  // homogeneous field in z direction, required by KFParticle
@@ -28,9 +29,10 @@
 // #include "Particles/V0.hxx"
 // #include "Trees/Writer.hxx"
 
-using namespace ROOT::VecOps;
+using namespace ROOT::RDF;
 using RDataFrame = ROOT::RDataFrame;
-using RNode = ROOT::RDF::RNode;
+
+using namespace ROOT::VecOps;
 using RVecI = ROOT::RVecI;  // reserved for masks and indices that could be -1
 using cRVecI = const ROOT::RVecI &;
 using RVecL = ROOT::RVecL;
@@ -48,13 +50,18 @@ using XYZPoint = ROOT::Math::XYZPoint;
 namespace Tree2Sexaquark {
 namespace Analysis {
 
+struct V0_tt {
+    ULong64_t neg, pos;
+    KFParticle kf, kf_neg, kf_pos;
+    PxPyPzMVector lv, lv_neg, lv_pos;
+};
+
 class Manager /* : public Writer */ {
    public:
     Manager() = default;
     ~Manager() = default;
 
     void Init();
-    // Bool_t PrepareOutputFile();
     RNode ProcessEvent(RNode df);
 
     /* Injected AntiSexaquark-Nucleon Interactions */
@@ -107,7 +114,7 @@ class Manager /* : public Writer */ {
     /* Utilities */
     inline Float_t GetMass(Int_t pdg_code) { return TDatabasePDG::Instance()->GetParticle(pdg_code)->Mass(); }
     void PrintAll(RNode df);
-    void EndOfAnalysis();
+    void EndOfAnalysis(RNode df);
 
    private:
     /* Functions */
@@ -115,16 +122,8 @@ class Manager /* : public Writer */ {
     void KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel);
     void KalmanSexaquarkFinder_TypeH(Bool_t anti_channel);
 
-    /* -- Files */
-    // std::unique_ptr<TFile> OutputFile;
     /* -- Event */
     KFVertex kfPrimaryVertex;  // primary vertex
-    /* Containers */
-    /* -- filled in `KalmanV0Finder()` and looped over in `KalmanSexaquarkFinder()` */
-    // std::vector<Candidate::V0> AntiLambdas;
-    // std::vector<Candidate::V0> Lambdas;
-    // std::vector<Candidate::V0> KaonsZeroShort;
-    // std::vector<Candidate::V0> PionPairs;
 };
 
 }  // namespace Analysis

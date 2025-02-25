@@ -19,7 +19,6 @@ int main(int argc, char *argv[]) {
 
     std::unique_ptr<Analysis::Manager> ThisAnalysis = std::make_unique<Analysis::Manager>();
     ThisAnalysis->Init();
-    // if (!ThisAnalysis->PrepareOutputFile()) return 1;
     /* Open Input File */
     RDataFrame DF_Input("Events", Analysis::Settings::PathInputFile);
     /* Start */
@@ -30,17 +29,16 @@ int main(int argc, char *argv[]) {
     /* MC */
     if (Analysis::Settings::IsMC) {
         DF_Main = ThisAnalysis->ProcessMCParticles(DF_Main);
-        if (Analysis::Settings::IsSignalMC) DF_Main = ThisAnalysis->ProcessInjected(DF_Main);
+        if (Analysis::Settings::IsSignalMC) DF_Main = ThisAnalysis->ProcessInjected(DF_Main);  // IN DEV RN
     }
     /* Tracks */
-    DF_Main = ThisAnalysis->ProcessTracks(DF_Main);
+    DF_Main = ThisAnalysis->ProcessTracks(DF_Main);  // IN DEV RN
     /* V0s */
-    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);
     // DF_Main = ThisAnalysis->FindV0s(DF_Main, 3122, -211, 2212);
-    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);
-    // ThisAnalysis->KalmanV0Finder(-211, 211, 422);
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);  // IN DEV RN
+    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);     // IN DEV RN
     /* Sexaquarks */
-    // ThisAnalysis->KalmanSexaquarkFinder(2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
     /*
     ThisAnalysis->KalmanSexaquarkFinder(-2112, {3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
     ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
@@ -48,8 +46,8 @@ int main(int argc, char *argv[]) {
     ThisAnalysis->KalmanSexaquarkFinder(2212, {321, 321});                // `AntiSexaquark,Proton -> K+,K+,X`
     ThisAnalysis->KalmanSexaquarkFinder(-2212, {-321, -321});             // `Sexaquark,AntiProton -> K-,K-,X`
     */
-    ThisAnalysis->PrintAll(DF_Main);
-    ThisAnalysis->EndOfAnalysis();
+    // ThisAnalysis->PrintAll(DF_Main);       // DEBUG
+    ThisAnalysis->EndOfAnalysis(DF_Main);  // IN DEV RN
 
     Analysis::Settings::DeleteInstance();
     Logger::DeleteInstance();
