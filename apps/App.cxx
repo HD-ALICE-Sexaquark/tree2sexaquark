@@ -29,14 +29,14 @@ int main(int argc, char *argv[]) {
     /* MC */
     if (Analysis::Settings::IsMC) {
         DF_Main = ThisAnalysis->ProcessMCParticles(DF_Main);
-        if (Analysis::Settings::IsSignalMC) DF_Main = ThisAnalysis->ProcessInjected(DF_Main);  // IN DEV RN
+        if (Analysis::Settings::IsSignalMC) DF_Main = ThisAnalysis->ProcessInjected(DF_Main);
     }
     /* Tracks */
-    DF_Main = ThisAnalysis->ProcessTracks(DF_Main);  // IN DEV RN
+    DF_Main = ThisAnalysis->ProcessTracks(DF_Main);
     /* V0s */
     // DF_Main = ThisAnalysis->FindV0s(DF_Main, 3122, -211, 2212);
-    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);  // IN DEV RN
-    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);     // IN DEV RN
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);
     /* Sexaquarks */
     // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
     /*
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     ThisAnalysis->KalmanSexaquarkFinder(-2212, {-321, -321});             // `Sexaquark,AntiProton -> K-,K-,X`
     */
     // ThisAnalysis->PrintAll(DF_Main);       // DEBUG
-    ThisAnalysis->EndOfAnalysis(DF_Main);  // IN DEV RN
+    ThisAnalysis->EndOfAnalysis(DF_Main);
 
     Analysis::Settings::DeleteInstance();
     Logger::DeleteInstance();

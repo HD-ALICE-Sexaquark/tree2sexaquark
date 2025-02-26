@@ -31,11 +31,12 @@ void Parser::AddOptions() {
     CLI_APP
         .add_option("-i,--input", Analysis::Settings::PathInputFile, "Path of input file")  //
         ->required()
-        ->check(CLI::ExistingPath);
-    Analysis::Settings::PathOutputFile = "./SexaquarkResults.root";  // default
+        ->check(CLI::ExistingFile);
     CLI_APP.add_option("-o,--output", Analysis::Settings::PathOutputFile, "Path of output file");
     CLI_APP.add_flag("-m,--mc", Analysis::Settings::IsMC, "Flag to process MC");
-    CLI_APP.add_flag("-s,--signal", Analysis::Settings::IsSignalMC, "Flag to process Signal MC");
+    CLI_APP
+        .add_flag("-s,--signal", Analysis::Settings::IsSignalMC, "Flag to process Signal MC")  //
+        ->needs("-m");
     CLI_APP
         .add_option("-n,--nevents", Analysis::Settings::LimitToNEvents, "Limit to N events")  //
         ->check(CLI::NonNegativeNumber & CLI::TypeValidator<unsigned long>());
@@ -56,6 +57,17 @@ int Parser::Parse(int argc, char* argv[]) {
         ExitCode = e.get_exit_code();
         HelpOrError = e.get_name() == "CallForHelp" || ExitCode;
         return CLI_APP.exit(e);
+    }
+    /* Default options */
+    if (Analysis::Settings::PathOutputFile.empty()) {
+        if (Analysis::Settings::IsMC) {
+            if (Analysis::Settings::IsSignalMC)
+                Analysis::Settings::PathOutputFile = "./SexaquarkResults_SignalMC.root";
+            else
+                Analysis::Settings::PathOutputFile = "./SexaquarkResults_MC.root";
+        } else {
+            Analysis::Settings::PathOutputFile = "./SexaquarkResults_Data.root";
+        }
     }
     return 0;
 }

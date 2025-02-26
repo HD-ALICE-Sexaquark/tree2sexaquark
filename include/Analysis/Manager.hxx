@@ -50,13 +50,20 @@ using XYZPoint = ROOT::Math::XYZPoint;
 namespace Tree2Sexaquark {
 namespace Analysis {
 
-struct V0_tt {
+struct FoundV0_TrueInfo {
+    ULong64_t neg, pos, v0;
+    Bool_t same_mother, is_true, is_signal, is_secondary, is_hybrid;
+    Int_t neg_pdg_code, pos_pdg_code, pdg_code;
+    UInt_t reaction_id;
+};
+
+struct FoundV0 {
     ULong64_t neg, pos;
     KFParticle kf, kf_neg, kf_pos;
     PxPyPzMVector lv, lv_neg, lv_pos;
 };
 
-class Manager /* : public Writer */ {
+class Manager {
    public:
     Manager() = default;
     ~Manager() = default;
@@ -122,8 +129,7 @@ class Manager /* : public Writer */ {
     void KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel);
     void KalmanSexaquarkFinder_TypeH(Bool_t anti_channel);
 
-    /* -- Event */
-    KFVertex kfPrimaryVertex;  // primary vertex
+    std::vector<std::string> fAnalyzed_V0sNames;
 };
 
 }  // namespace Analysis
