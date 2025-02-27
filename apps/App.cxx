@@ -38,9 +38,9 @@ int main(int argc, char *argv[]) {
     DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);
     DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);
     /* Sexaquarks */
-    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, -2112, 3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
     /*
-    ThisAnalysis->KalmanSexaquarkFinder(-2112, {3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
     ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
     ThisAnalysis->KalmanSexaquarkFinder(-2212, {3122, -321, -211, 211});  // `Sexaquark,AntiProton -> Lambda,K-,(pi-,pi+)`
     ThisAnalysis->KalmanSexaquarkFinder(2212, {321, 321});                // `AntiSexaquark,Proton -> K+,K+,X`

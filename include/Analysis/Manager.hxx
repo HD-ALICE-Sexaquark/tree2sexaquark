@@ -51,16 +51,30 @@ namespace Tree2Sexaquark {
 namespace Analysis {
 
 struct FoundV0_TrueInfo {
-    ULong64_t neg, pos, v0;
+    ULong64_t neg, pos, entry;
     Bool_t same_mother, is_true, is_signal, is_secondary, is_hybrid;
     Int_t neg_pdg_code, pos_pdg_code, pdg_code;
     UInt_t reaction_id;
 };
 
 struct FoundV0 {
-    ULong64_t neg, pos;
+    ULong64_t idx, neg, pos;
     KFParticle kf, kf_neg, kf_pos;
     PxPyPzMVector lv, lv_neg, lv_pos;
+};
+
+struct TypeA_TrueInfo {
+    FoundV0_TrueInfo v0a_mc, v0b_mc;
+    Bool_t is_signal, is_hybrid;
+    UInt_t reaction_id;
+    // ULong64_t ancestor; // PENDING
+    // Bool_t same_ancestor, is_noncomb_bkg; // PENDING
+};
+
+struct TypeA {
+    FoundV0 v0a, v0b;
+    KFParticle kf;
+    PxPyPzMVector lv, lv_asdecay;
 };
 
 class Manager {
@@ -84,26 +98,19 @@ class Manager {
     RNode FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos);
 
     /* Sexaquarks */
-    void KalmanSexaquarkFinder(Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
+    RNode FindSexaquarks(RNode df, Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
         if (TMath::Abs(pdg_struck_nucleon) == 2112) {
-            KalmanSexaquarkFinder_TypeA(pdg_struck_nucleon > 0);
-        } else if (TMath::Abs(pdg_struck_nucleon) == 2212) {
-            if (pdg_reaction_products.size() > 2)
-                KalmanSexaquarkFinder_TypeDE(pdg_struck_nucleon > 0);
-            else
-                KalmanSexaquarkFinder_TypeH(pdg_struck_nucleon > 0);
-        } else {
-            ErrorF("Struck nucleon %s not recognized", TDatabasePDG::Instance()->GetParticle(pdg_struck_nucleon)->GetName());
+            return FindSexaquarks_TypeA(df, pdg_struck_nucleon < 0);
         }
+        if (pdg_reaction_products.size() > 2) {
+            return FindSexaquarks_TypeDE(df, pdg_struck_nucleon < 0);
+        }
+        return FindSexaquarks_TypeH(df, pdg_struck_nucleon < 0);
     }
 
     void CollectTrueInfo_ChannelA();
-    void CollectTrueInfo_ChannelD();
-    void CollectTrueInfo_ChannelE();
-    void CollectTrueInfo_ChannelH();
 
     /* Cuts */
-    // Cuts::Inspector Inspector;
 
     /* Vector Gymnastics */
     static RVecI Mask(cRVecUL entries, size_t reference_size);
@@ -125,9 +132,9 @@ class Manager {
 
    private:
     /* Functions */
-    void KalmanSexaquarkFinder_TypeA(Bool_t anti_channel);
-    void KalmanSexaquarkFinder_TypeDE(Bool_t anti_channel);
-    void KalmanSexaquarkFinder_TypeH(Bool_t anti_channel);
+    RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
 
     std::vector<std::string> fAnalyzed_V0sNames;
 };
