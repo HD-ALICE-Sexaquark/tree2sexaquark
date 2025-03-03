@@ -1,36 +1,18 @@
 #ifndef T2S_ANALYSIS_MANAGER_HXX
 #define T2S_ANALYSIS_MANAGER_HXX
 
-#include "ROOT/RResultPtr.hxx"
 #include "RtypesCore.h"
-#include "TDatabasePDG.h"
-#include "TDirectoryFile.h"
-#include "TFile.h"
-#include "TInterpreter.h"
-#include "TROOT.h"
-#include "TString.h"
-
-#include "ROOT/RDF/InterfaceUtils.hxx"
-#include "ROOT/RDataFrame.hxx"
-#include "ROOT/RVec.hxx"
 
 #include "Math/Point3D.h"
 #include "Math/Vector4D.h"
 
-#ifndef HomogeneousField
-#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
-#endif
-#include "KFVertex.h"
-
-#include "Utilities/Logger.hxx"
-
-#include "Analysis/Settings.hxx"
-// #include "Cuts/Inspector.hxx"
-// #include "Particles/V0.hxx"
-// #include "Trees/Writer.hxx"
+#include "ROOT/RDF/InterfaceUtils.hxx"
+#include "ROOT/RDataFrame.hxx"
 
 using namespace ROOT::RDF;
 using RDataFrame = ROOT::RDataFrame;
+
+#include "ROOT/RVec.hxx"
 
 using namespace ROOT::VecOps;
 using RVecI = ROOT::RVecI;  // reserved for masks and indices that could be -1
@@ -47,7 +29,27 @@ using cRVecF = const ROOT::RVecF &;
 using PxPyPzMVector = ROOT::Math::PxPyPzMVector;
 using XYZPoint = ROOT::Math::XYZPoint;
 
+#ifndef HomogeneousField
+#define HomogeneousField  // homogeneous field in z direction, required by KFParticle
+#endif
+#include "KFParticle.h"
+
 namespace Tree2Sexaquark {
+
+namespace PdgCode {
+const Int_t PiMinus = -211;
+const Int_t PiPlus = 211;
+const Int_t NegKaon = -321;
+const Int_t PosKaon = 321;
+const Int_t AntiProton = -2212;
+const Int_t Proton = 2212;
+const Int_t AntiNeutron = -2112;
+const Int_t Neutron = 2112;
+const Int_t AntiLambda = -3122;
+const Int_t Lambda = 3122;
+const Int_t KaonZeroShort = 310;
+}  // namespace PdgCode
+
 namespace Analysis {
 
 struct FoundV0_TrueInfo {
@@ -59,7 +61,7 @@ struct FoundV0_TrueInfo {
 
 struct FoundV0 {
     ULong64_t idx, neg, pos;
-    KFParticle kf, kf_neg, kf_pos;
+    XYZPoint v3;
     PxPyPzMVector lv, lv_neg, lv_pos;
 };
 
@@ -82,30 +84,30 @@ class Manager {
     Manager() = default;
     ~Manager() = default;
 
-    void Init();
-    RNode ProcessEvent(RNode df);
+    static void Init();
+    static RNode ProcessEvent(RNode df);
 
     /* Injected AntiSexaquark-Nucleon Interactions */
-    RNode ProcessInjected(RNode df);
+    static RNode ProcessInjected(RNode df);
 
     /* MC Particles */
-    RNode ProcessMCParticles(RNode df);
+    static RNode ProcessMCParticles(RNode df);
 
     /* Tracks */
-    RNode ProcessTracks(RNode df);
+    static RNode ProcessTracks(RNode df);
 
     /* V0s */
-    RNode FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos);
+    RNode FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pdg_code_pos);
 
     /* Sexaquarks */
-    RNode FindSexaquarks(RNode df, Int_t pdg_struck_nucleon, std::vector<Int_t> pdg_reaction_products) {
-        if (TMath::Abs(pdg_struck_nucleon) == 2112) {
-            return FindSexaquarks_TypeA(df, pdg_struck_nucleon < 0);
+    RNode FindSexaquarks(const RNode &data_frame, Int_t pdg_struck_nucleon, const std::vector<Int_t> &pdg_reaction_products) {
+        if (TMath::Abs(pdg_struck_nucleon) == PdgCode::Neutron) {
+            return FindSexaquarks_TypeA(data_frame, pdg_struck_nucleon < 0);
         }
         if (pdg_reaction_products.size() > 2) {
-            return FindSexaquarks_TypeDE(df, pdg_struck_nucleon < 0);
+            return FindSexaquarks_TypeDE(data_frame, pdg_struck_nucleon < 0);
         }
-        return FindSexaquarks_TypeH(df, pdg_struck_nucleon < 0);
+        return FindSexaquarks_TypeH(data_frame, pdg_struck_nucleon < 0);
     }
 
     void CollectTrueInfo_ChannelA();
@@ -126,7 +128,6 @@ class Manager {
     static RVec<T> ExtractVector_Sum(const RVec<T> &property, const RVec<RVecUL> &entries_);
 
     /* Utilities */
-    inline Float_t GetMass(Int_t pdg_code) { return TDatabasePDG::Instance()->GetParticle(pdg_code)->Mass(); }
     void PrintAll(RNode df);
     void EndOfAnalysis(RNode df);
 

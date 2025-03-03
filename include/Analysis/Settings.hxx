@@ -5,18 +5,17 @@
 
 #include "Utilities/Logger.hxx"
 
-namespace Tree2Sexaquark {
-namespace Analysis {
+namespace Tree2Sexaquark::Analysis {
 
 /*
  * Singleton.
  */
 class Settings {
    public:
-    Settings(Settings &other) = delete;
-    void operator=(const Settings &) = delete;
-    static Settings *GetInstance();
-    static void DeleteInstance();
+    Settings(const Settings& other) = delete;
+    Settings& operator=(const Settings& other) = delete;
+
+    static Settings& Instance();
 
     static void Print() {
         InfoF("IsMC           = %i", IsMC);
@@ -36,10 +35,8 @@ class Settings {
    private:
     Settings() = default;
     ~Settings() = default;
-    static Settings *Instance;
 };
 
-}  // namespace Analysis
-}  // namespace Tree2Sexaquark
+}  // namespace Tree2Sexaquark::Analysis
 
 #endif  // T2S_ANALYSIS_SETTINGS_HXX

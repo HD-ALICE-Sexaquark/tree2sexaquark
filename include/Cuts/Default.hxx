@@ -1,14 +1,9 @@
 #ifndef T2S_DEFAULT_CUTS_HXX
 #define T2S_DEFAULT_CUTS_HXX
 
-#include <map>
-#include <tuple>
-
 #include "RtypesCore.h"
-#include "TString.h"
 
-namespace Tree2Sexaquark {
-namespace Default {
+namespace Tree2Sexaquark::Default {
 
 namespace Proton {
 const Double_t MaxNSigma = 3.;
@@ -35,7 +30,7 @@ const Double_t MinDCAwrtPV = 4.;
 const Double_t MaxDCAbtwDau = 2.;
 const Double_t MaxDCAnegV0 = 2.;
 const Double_t MaxDCAposV0 = 2.;
-const Double_t MaxArmQtOverAlpha = 0.2;
+const Double_t AbsMaxArmQtOverAlpha = 0.2;
 }  // namespace Lambda
 
 namespace KaonZeroShort {
@@ -120,7 +115,6 @@ const Double_t MaxDCAkaSV = 0.2;
 const Double_t MaxDCAkbSV = 0.2;
 }  // namespace KaonPair
 
-}  // namespace Default
-}  // namespace Tree2Sexaquark
+}  // namespace Tree2Sexaquark::Default
 
 #endif  // T2S_DEFAULT_CUTS_HXX

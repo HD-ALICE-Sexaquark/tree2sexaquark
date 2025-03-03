@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "Utilities/Parser.hxx"
 
 #include "Analysis/Settings.hxx"
@@ -18,7 +20,7 @@ Parser::Parser()  //
  * Default constructor (with arguments)
  */
 Parser::Parser(std::string app_description)  //
-    : ExitCode(0), HelpOrError(false), CLI_APP(app_description) {
+    : ExitCode(0), HelpOrError(false), CLI_APP(std::move(app_description)) {
     //
     AddOptions();
 }
@@ -55,16 +57,17 @@ int Parser::Parse(int argc, char* argv[]) {
         CLI_APP.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
         ExitCode = e.get_exit_code();
-        HelpOrError = e.get_name() == "CallForHelp" || ExitCode;
+        HelpOrError = e.get_name() == "CallForHelp" || (ExitCode != 0);
         return CLI_APP.exit(e);
     }
     /* Default options */
     if (Analysis::Settings::PathOutputFile.empty()) {
         if (Analysis::Settings::IsMC) {
-            if (Analysis::Settings::IsSignalMC)
+            if (Analysis::Settings::IsSignalMC) {
                 Analysis::Settings::PathOutputFile = "./SexaquarkResults_SignalMC.root";
-            else
+            } else {
                 Analysis::Settings::PathOutputFile = "./SexaquarkResults_MC.root";
+            }
         } else {
             Analysis::Settings::PathOutputFile = "./SexaquarkResults_Data.root";
         }

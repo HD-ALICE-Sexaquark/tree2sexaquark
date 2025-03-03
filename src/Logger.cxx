@@ -5,14 +5,14 @@ using std::ofstream;
 using std::ostream;
 
 // implementation of a singleton here
-Logger* Logger::Instance = NULL;
+Logger* Logger::Instance = nullptr;
 Bool_t Logger::DebugEnabled = kTRUE;
 
 /*
  * Get Logger singleton instance
  */
 Logger* Logger::GetInstance() {
-    if (Instance == NULL) Instance = new Logger;
+    if (Instance == nullptr) Instance = new Logger;
     return Instance;
 }
 
@@ -20,9 +20,9 @@ Logger* Logger::GetInstance() {
  * Delete Logger singleton instance
  */
 void Logger::DeleteInstance() {
-    if (Instance != NULL) {
+    if (Instance != nullptr) {
         delete Instance;
-        Instance = NULL;
+        Instance = nullptr;
     }
 }
 
@@ -34,8 +34,8 @@ Logger::Logger() {
     for (Int_t iType = kError; iType < kMaxType; iType++) {
         fOutputTypes[iType] = 0;
         fFileNames[iType] = "";
-        fOutputFiles[iType] = NULL;
-        fOutputStreams[iType] = NULL;
+        fOutputFiles[iType] = nullptr;
+        fOutputStreams[iType] = nullptr;
 
         fPrintType[iType] = kTRUE;
         fPrintModule[iType] = kFALSE;
@@ -59,7 +59,7 @@ Logger::~Logger() {
     fflush(stderr);
     fflush(stdout);
 
-    Instance = NULL;
+    Instance = nullptr;
 }
 
 /*
@@ -71,12 +71,12 @@ Logger::~Logger() {
  */
 void Logger::PrintString(Int_t type, FILE* stream, const char* format, ...) {
 
-    if (format == NULL) return;
+    if (format == nullptr) return;
 
     va_list ap;
     va_start(ap, format);
     if (fOutputTypes[type] != 3) {
-        if (stream != NULL) {
+        if (stream != nullptr) {
             vfprintf(stream, format, ap);
         }
     } else {
@@ -138,8 +138,8 @@ void Logger::CloseFile(Int_t type) {
             delete fOutputStreams[type];
         }
     }
-    fOutputFiles[type] = NULL;
-    fOutputStreams[type] = NULL;
+    fOutputFiles[type] = nullptr;
+    fOutputStreams[type] = nullptr;
     fFileNames[type] = "";
     fOutputTypes[type] = 0;
 }
@@ -156,8 +156,8 @@ FILE* Logger::GetOutputStream(Int_t type) {
         return stderr;
     else if (fOutputTypes[type] == 2) {
         if (!fOutputFiles[type]) {
-            FILE* file = NULL;
-            ostream* stream = NULL;
+            FILE* file = nullptr;
+            ostream* stream = nullptr;
             if (!fFileNames[type].IsNull()) {
                 for (Int_t iType = kError; iType < kMaxType; iType++) {
                     if ((iType != type) && (fFileNames[iType].CompareTo(fFileNames[type]) == 0) && fOutputFiles[iType]) {

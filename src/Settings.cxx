@@ -1,29 +1,18 @@
 #include "Analysis/Settings.hxx"
 
-namespace Tree2Sexaquark {
-namespace Analysis {
+namespace Tree2Sexaquark::Analysis {
 
 /* default values */
-std::string Settings::PathInputFile = "";
-std::string Settings::PathOutputFile = "";
+std::string Settings::PathInputFile;
+std::string Settings::PathOutputFile;
 bool Settings::IsMC = false;
 bool Settings::IsSignalMC = false;
 unsigned long Settings::LimitToNEvents = 0;
 unsigned int Settings::NThreads = 1;
 
-Settings* Settings::Instance = nullptr;
-
-Settings* Settings::GetInstance() {
-    if (!Instance) Instance = new Settings();
-    return Instance;
+Settings& Settings::Instance() {
+    static Settings instance;
+    return instance;
 }
 
-void Settings::DeleteInstance() {
-    if (!Instance) {
-        delete Instance;
-        Instance = nullptr;
-    }
-}
-
-}  // namespace Analysis
-}  // namespace Tree2Sexaquark
+}  // namespace Tree2Sexaquark::Analysis

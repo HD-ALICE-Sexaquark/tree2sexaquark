@@ -1,20 +1,19 @@
 #include "Analysis/Manager.hxx"
 
+#include <cstddef>
 #include <set>
 
+#include "KFVertex.h"
 #include "RtypesCore.h"
 #include "TDatabasePDG.h"
 #include "TROOT.h"
-
-#include "KFParticle.h"
 
 #include "Analysis/Settings.hxx"
 #include "Cuts/Default.hxx"
 #include "Math/Common.hxx"
 #include "Math/KalmanFilter.hxx"
 
-namespace Tree2Sexaquark {
-namespace Analysis {
+namespace Tree2Sexaquark::Analysis {
 
 /*                   */
 /* Vector Gymnastics */
@@ -23,7 +22,9 @@ namespace Analysis {
 // mask a vector, e.g. {0,2} -> {1,0,1}
 RVecI Manager::Mask(cRVecUL entries, size_t reference_size) {
     RVecI output(reference_size);
-    for (auto entry : entries) output[entry] = 1;
+    for (auto entry : entries) {
+        output[entry] = 1;
+    }
     return output;
 }
 
@@ -58,43 +59,39 @@ RVec<T> Manager::ExtractVector_Sum(const RVec<T> &property, const RVec<RVecUL> &
 }
 
 void Manager::Init() {
-    //
-    ROOT::EnableThreadSafety();
-    if (Settings::NThreads > 1) ROOT::EnableImplicitMT(Settings::NThreads);
+    if (Settings::NThreads > 1) {
+        ROOT::EnableThreadSafety();
+        ROOT::EnableImplicitMT(Settings::NThreads);
+    }
 }
 
 RNode Manager::ProcessEvent(RNode df) {
     //
-    /* Set Event Properties */
-    /* -- Magnetic Field */
-    // KFParticle::SetField(Event.MagneticField);
-    /* -- Primary Vertex */
-    // Float_t XYZ[3] = {Event.PV_Xv, Event.PV_Yv, Event.PV_Zv};
-    // Float_t CovMatrix[6] = {Event.PV_CovMatrix[0], Event.PV_CovMatrix[1], Event.PV_CovMatrix[2],
-    // Event.PV_CovMatrix[3], Event.PV_CovMatrix[4], Event.PV_CovMatrix[5]};
-    // kfPrimaryVertex = Math::CreateKFVertex(XYZ, CovMatrix);
     auto CallCreateKFVertex = [](Float_t x, Float_t y, Float_t z, cRVecF cov_matrix) -> KFVertex {
         Float_t XYZ[3] = {x, y, z};
         Float_t CovMatrix[6] = {cov_matrix[0], cov_matrix[1], cov_matrix[2], cov_matrix[3], cov_matrix[4], cov_matrix[5]};
         return Math::CreateKFVertex(XYZ, CovMatrix);
     };
 
-    RNode DF_Events = df.Define("Event_KF_PV", CallCreateKFVertex, {"PV_Xv", "PV_Yv", "PV_Zv", "PV_CovMatrix"});
+    RNode DF_Events = df  //
+                          .Define("Event_PV", [](Float_t x, Float_t y, Float_t z) { return XYZPoint(x, y, z); }, {"PV_Xv", "PV_Yv", "PV_Zv"})
+                          .Define("Event_KF_PV", CallCreateKFVertex, {"PV_Xv", "PV_Yv", "PV_Zv", "PV_CovMatrix"});
 
     return DF_Events;
 }
 
 RNode Manager::ProcessMCParticles(RNode df) {
     //
-    auto GetCharge = [](cRVecI pdg_code) -> RVecI {
+    auto GetCharge = [](cRVecI pdg_codes) -> RVecI {
         RVecI mc_charge;
-        mc_charge.reserve(pdg_code.size());
-        for (size_t i = 0; i < pdg_code.size(); i++) {
-            auto particle = TDatabasePDG::Instance()->GetParticle(pdg_code[i]);
-            if (!particle)
+        mc_charge.reserve(pdg_codes.size());
+        for (auto pdg_code : pdg_codes) {
+            auto *particle = TDatabasePDG::Instance()->GetParticle(pdg_code);
+            if (!particle) {
                 mc_charge.emplace_back(0);
-            else
+            } else {
                 mc_charge.emplace_back(Int_t(particle->Charge() / 3.));  // convert units from |e|/3 to |e|
+            }
         }
         return mc_charge;
     };
@@ -104,18 +101,18 @@ RNode Manager::ProcessMCParticles(RNode df) {
         auto daughters_entries = Nonzero(mc_mask);
         auto mothers_entries = mother_mc_entry_[mc_mask];
         for (size_t i = 0; i < mothers_entries.size(); i++) {
-            output[mothers_entries[i]] = daughters_entries[i];
+            output[mothers_entries[i]] = (Long_t)daughters_entries[i];
         }
         return output;
     };
     //
     auto GetAncestor = [](cRVecL mother_mc_entry_) -> RVecL {
         RVecL output(mother_mc_entry_.size(), -1);
-        Int_t curr_entry;
+        Long_t curr_entry = 0;
         for (size_t i = 0; i < mother_mc_entry_.size(); i++) {
             // if no mother, the particle is its own ancestor
             if (mother_mc_entry_[i] < 0) {
-                output[i] = i;
+                output[i] = (Long_t)i;
                 continue;
             }
             // find the last ancestor
@@ -192,13 +189,14 @@ RNode Manager::ProcessInjected(RNode df) {
         RVecI output;
         output.reserve(injected_mc_entries_.size());
         Bool_t all_findable, mc_is_findable;
-        for (auto products_vec : injected_mc_entries_) {
+        for (const auto &products_vec : injected_mc_entries_) {
             all_findable = true;
             for (auto mc_entry : products_vec) {
-                if (TMath::Abs(pdg_code[mc_entry]) == 3122 || pdg_code[mc_entry] == 310)
+                if (TMath::Abs(pdg_code[mc_entry]) == PdgCode::Lambda || pdg_code[mc_entry] == PdgCode::KaonZeroShort) {
                     mc_is_findable = mc_true_v0_is_findable[mc_entry];
-                else
+                } else {
                     mc_is_findable = mc_got_tracked[mc_entry];
+                }
                 all_findable &= mc_is_findable;
             }
             output.emplace_back(all_findable);
@@ -228,14 +226,18 @@ RNode Manager::ProcessInjected(RNode df) {
 
 RNode Manager::ProcessTracks(RNode df) {
     //
+    const Double_t mass_proton = TDatabasePDG::Instance()->GetParticle(2212)->Mass();
+    const Double_t mass_kaon = TDatabasePDG::Instance()->GetParticle(321)->Mass();
+    const Double_t mass_pion = TDatabasePDG::Instance()->GetParticle(211)->Mass();
+    //
     auto GetTrackCovMatrix = [](cRVecF track_sigma_y2, cRVecF track_sigma_zy, cRVecF track_sigma_z2,             //
                                 cRVecF track_sigma_snp_y, cRVecF track_sigma_snp_z, cRVecF track_sigma_snp2,     //
                                 cRVecF track_sigma_tgl_y, cRVecF track_sigma_tgl_z, cRVecF track_sigma_tgl_snp,  //
                                 cRVecF track_sigma_tgl2, cRVecF track_sigma_1pt_y, cRVecF track_sigma_1pt_z,     //
-                                cRVecF track_sigma_1pt_snp, cRVecF track_sigma_1pt_tgl, cRVecF track_sigma_1pt2) -> RVec<Float_t *> {
-        RVec<Float_t *> output;
+                                cRVecF track_sigma_1pt_snp, cRVecF track_sigma_1pt_tgl, cRVecF track_sigma_1pt2) -> RVec<RVecF> {
+        RVec<RVecF> output;
         output.reserve(track_sigma_y2.size());
-        Float_t cov_matrix[15];
+        RVecF cov_matrix(15);
         for (size_t track_entry = 0; track_entry < track_sigma_y2.size(); track_entry++) {
             cov_matrix[0] = track_sigma_y2[track_entry];
             cov_matrix[1] = track_sigma_zy[track_entry];
@@ -257,24 +259,25 @@ RNode Manager::ProcessTracks(RNode df) {
         return output;
     };
 
-    RNode df_Tracks =  //
-        df.Define("N_Tracks", "Track_Px.size()")
-            /* # PID */
-            .Define("Track_PID_AsAntiProton", "abs(Track_NSigmaProton) < 3. && Track_Charge < 0")
-            .Define("Track_PID_AsProton", "abs(Track_NSigmaProton) < 3. && Track_Charge > 0")
-            .Define("Track_PID_AsNegKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge < 0")
-            .Define("Track_PID_AsPosKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge > 0")
-            .Define("Track_PID_AsPiMinus", "abs(Track_NSigmaPion) < 3. && Track_Charge < 0")
-            .Define("Track_PID_AsPiPlus", "abs(Track_NSigmaPion) < 3. && Track_Charge > 0")
-            .Define("AntiProton_TrackEntry_", "Nonzero(Track_PID_AsAntiProton)")
-            .Define("Proton_TrackEntry_", "Nonzero(Track_PID_AsProton)")
-            .Define("PiMinus_TrackEntry_", "Nonzero(Track_PID_AsPiMinus)")
-            .Define("PiPlus_TrackEntry_", "Nonzero(Track_PID_AsPiPlus)")
-            /* # Utilities */
-            .Define("Track_CovMatrix", GetTrackCovMatrix,                                                              //
-                    {"Track_SigmaY2", "Track_SigmaZY", "Track_SigmaZ2", "Track_SigmaSnpY", "Track_SigmaSnpZ",          //
-                     "Track_SigmaSnp2", "Track_SigmaTglY", "Track_SigmaTglZ", "Track_SigmaTglSnp", "Track_SigmaTgl2",  //
-                     "Track_Sigma1PtY", "Track_Sigma1PtZ", "Track_Sigma1PtSnp", "Track_Sigma1PtTgl", "Track_Sigma1Pt2"});
+    RNode df_Tracks = df.Define("N_Tracks", "Track_Px.size()")
+                          /* # PID */
+                          .Define("Track_PID_AsAntiProton", "abs(Track_NSigmaProton) < 3. && Track_Charge < 0")
+                          .Define("Track_PID_AsProton", "abs(Track_NSigmaProton) < 3. && Track_Charge > 0")
+                          .Define("Track_PID_AsNegKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge < 0")
+                          .Define("Track_PID_AsPosKaon", "abs(Track_NSigmaKaon) < 3. && Track_Charge > 0")
+                          .Define("Track_PID_AsPiMinus", "abs(Track_NSigmaPion) < 3. && Track_Charge < 0")
+                          .Define("Track_PID_AsPiPlus", "abs(Track_NSigmaPion) < 3. && Track_Charge > 0")
+                          .Define("AntiProton_TrackEntry_", "Nonzero(Track_PID_AsAntiProton)")
+                          .Define("Proton_TrackEntry_", "Nonzero(Track_PID_AsProton)")
+                          .Define("NegKaon_TrackEntry_", "Nonzero(Track_PID_AsNegKaon)")
+                          .Define("PosKaon_TrackEntry_", "Nonzero(Track_PID_AsPosKaon)")
+                          .Define("PiMinus_TrackEntry_", "Nonzero(Track_PID_AsPiMinus)")
+                          .Define("PiPlus_TrackEntry_", "Nonzero(Track_PID_AsPiPlus)")
+                          /* # Utilities */
+                          .Define("Track_CovMatrix", GetTrackCovMatrix,                                                              //
+                                  {"Track_SigmaY2", "Track_SigmaZY", "Track_SigmaZ2", "Track_SigmaSnpY", "Track_SigmaSnpZ",          //
+                                   "Track_SigmaSnp2", "Track_SigmaTglY", "Track_SigmaTglZ", "Track_SigmaTglSnp", "Track_SigmaTgl2",  //
+                                   "Track_Sigma1PtY", "Track_Sigma1PtZ", "Track_Sigma1PtSnp", "Track_Sigma1PtTgl", "Track_Sigma1Pt2"});
 
     if (Settings::IsMC) {
         df_Tracks = df_Tracks  //
@@ -292,112 +295,118 @@ RNode Manager::ProcessTracks(RNode df) {
 /*
  * Find all V0s via Kalman Filter.
  */
-RNode Manager::FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos) {
+RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pdg_code_pos) {
     //
-    const Double_t neg_mass = TDatabasePDG::Instance()->GetParticle(pdg_neg)->Mass();
-    const Double_t pos_mass = TDatabasePDG::Instance()->GetParticle(pdg_pos)->Mass();
+    const Double_t neg_mass = TDatabasePDG::Instance()->GetParticle(pdg_code_neg)->Mass();
+    const Double_t pos_mass = TDatabasePDG::Instance()->GetParticle(pdg_code_pos)->Mass();
     //
     std::string v0_name, neg_name, pos_name;
-    if (pdg_v0 == 3122) {
+    if (pdg_code_v0 == PdgCode::Lambda) {
         v0_name = "L";
         neg_name = "PiMinus";
         pos_name = "Proton";
-    } else if (pdg_v0 == -3122) {
+    } else if (pdg_code_v0 == PdgCode::AntiLambda) {
         v0_name = "AL";
         neg_name = "AntiProton";
         pos_name = "PiPlus";
-    } else if (pdg_v0 == 310) {
+    } else if (pdg_code_v0 == PdgCode::KaonZeroShort) {
         v0_name = "K0S";
         neg_name = "PiMinus";
         pos_name = "PiPlus";
     }
     fAnalyzed_V0sNames.push_back(v0_name);
     //
-    auto KF_V0Finder = [pdg_v0, neg_mass, pos_mass](cRVecUL entries_neg, cRVecUL entries_pos,                                     //
-                                                    cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z, RVecI charge,  //
-                                                    cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt, const RVec<Float_t *> &cov_matrix,
-                                                    const Float_t &magnetic_field, const KFVertex &kf_pv) -> RVec<FoundV0> {
+    auto KF_V0Finder = [pdg_code_v0, neg_mass, pos_mass](cRVecUL entries_neg_, cRVecUL entries_pos_,                            //
+                                                         cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,         //
+                                                         RVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
+                                                         const RVec<RVecF> &cov_matrix,                                         //
+                                                         const Float_t &magnetic_field, const XYZPoint &v3_pv) -> RVec<FoundV0> {
         RVec<FoundV0> output;
         FoundV0 this_v0;
         /* protection */
-        if (!entries_neg.size() || !entries_pos.size()) return output;
+        if (!entries_neg_.size() || !entries_pos_.size()) return output;
         /* one-time definitions */
         KFParticle::SetField(magnetic_field);
-        XYZPoint v3_pv(kf_pv.GetX(), kf_pv.GetY(), kf_pv.GetZ());
-        /* auxiliary vars */
-        ULong64_t neg, pos;
-        KFParticle kf_neg, kf_pos;
-        PxPyPzMVector lv_v0, lv_neg, lv_pos;
+        /* main vars */
         XYZPoint v3_v0;
-        Double_t cpa_wrt_pv, dca_wrt_pv, dca_btw_dau, dca_neg_v0, dca_pos_v0;
-        Double_t arm_qt, arm_alpha;
-        for (auto neg : entries_neg) {
-            for (auto pos : entries_pos) {
+        PxPyPzMVector lv_neg;
+        PxPyPzMVector lv_pos;
+        PxPyPzMVector lv_v0;
+        /* auxiliary vars */
+        Double_t cpa_wrt_pv, dca_wrt_pv;
+        Double_t dca_btw_dau, dca_neg_v0, dca_pos_v0;
+        Double_t arm_qt, arm_alpha, qt_over_alpha;
+        /* loop over all pairs */
+        for (auto neg : entries_neg_) {
+            for (auto pos : entries_pos_) {
                 /* sanity check */
                 if (neg == pos) continue;
                 /* geometry */
-                kf_neg = Math::CreateKFParticle(px[neg], py[neg], pz[neg], x[neg], y[neg], z[neg], charge[neg], alpha[neg], snp[neg], tgl[neg],
-                                                signed1pt[neg], cov_matrix[neg], neg_mass);
-                kf_pos = Math::CreateKFParticle(px[pos], py[pos], pz[pos], x[pos], y[pos], z[pos], charge[pos], alpha[pos], snp[pos], tgl[pos],
-                                                signed1pt[pos], cov_matrix[pos], pos_mass);
+                KFParticle kf_neg = Math::CreateKFParticle(px[neg], py[neg], pz[neg], x[neg], y[neg], z[neg],            //
+                                                           charge[neg], alpha[neg], snp[neg], tgl[neg], signed1pt[neg],  //
+                                                           cov_matrix[neg], neg_mass);
+                KFParticle kf_pos = Math::CreateKFParticle(px[pos], py[pos], pz[pos], x[pos], y[pos], z[pos],            //
+                                                           charge[pos], alpha[pos], snp[pos], tgl[pos], signed1pt[pos],  //
+                                                           cov_matrix[pos], pos_mass);
                 KFParticle kf_v0;
                 kf_v0.AddDaughter(kf_neg);
                 kf_v0.AddDaughter(kf_pos);
+                kf_v0.TransportToDecayVertex();
                 v3_v0.SetCoordinates(kf_v0.GetX(), kf_v0.GetY(), kf_v0.GetZ());
-                if (TMath::IsNaN(v3_v0.R())) continue;
+                /* transport */
+                kf_neg.SetProductionVertex(kf_v0);     // TEST
+                kf_pos.SetProductionVertex(kf_v0);     // TEST
+                kf_neg.TransportToProductionVertex();  // TEST
+                kf_pos.TransportToProductionVertex();  // TEST
                 /* kinematics */
                 lv_neg.SetCoordinates(kf_neg.Px(), kf_neg.Py(), kf_neg.Pz(), neg_mass);
                 lv_pos.SetCoordinates(kf_pos.Px(), kf_pos.Py(), kf_pos.Pz(), pos_mass);
                 lv_v0 = lv_neg + lv_pos;
-                /* cuts */
+                /* calculate vars */
+                dca_btw_dau = TMath::Abs((Double_t)kf_neg.GetDistanceFromParticle(kf_pos));
+                dca_neg_v0 = TMath::Abs((Double_t)kf_neg.GetDistanceFromVertex(kf_v0));
+                dca_pos_v0 = TMath::Abs((Double_t)kf_pos.GetDistanceFromVertex(kf_v0));
                 /* -- (anti)lambda cuts */
-                if (TMath::Abs(pdg_v0) == 3122) {
+                if (TMath::Abs(pdg_code_v0) == PdgCode::Lambda) {
                     if (TMath::Abs(lv_v0.Eta()) > Default::Lambda::AbsMaxEta) continue;
                     if (lv_v0.Pt() < Default::Lambda::MinPt) continue;
                     if (lv_v0.M() < Default::Lambda::MinMass || lv_v0.M() > Default::Lambda::MaxMass) continue;
-                    if (v3_v0.Rho() < Default::Lambda::MinRadius || v3_v0.Rho() > 200.) continue;
+                    if (v3_v0.Rho() < Default::Lambda::MinRadius) continue;  // NOTE: could set upper limit
                     if ((v3_v0 - v3_pv).R() < Default::Lambda::MinDistFromPV) continue;
                     /*  */ cpa_wrt_pv = Math::CosinePointingAngle(lv_v0.Vect(), v3_v0, v3_pv);
                     if (cpa_wrt_pv < Default::Lambda::MinCPAwrtPV || cpa_wrt_pv > Default::Lambda::MaxCPAwrtPV) continue;
-                    /*  */ dca_wrt_pv = TMath::Abs((Double_t)kf_v0.GetDistanceFromVertex(kf_pv));
+                    /*  */ dca_wrt_pv = Math::LinePointDCA(lv_v0.Vect(), v3_v0, v3_pv);
                     if (dca_wrt_pv < Default::Lambda::MinDCAwrtPV) continue;
-                    /*  */ dca_btw_dau = TMath::Abs((Double_t)kf_neg.GetDistanceFromParticle(kf_pos));
                     if (dca_btw_dau > Default::Lambda::MaxDCAbtwDau) continue;
-                    /*  */ dca_neg_v0 = TMath::Abs((Double_t)kf_neg.GetDistanceFromVertex(kf_v0));
                     if (dca_neg_v0 > Default::Lambda::MaxDCAnegV0) continue;
-                    /*  */ dca_pos_v0 = TMath::Abs((Double_t)kf_pos.GetDistanceFromVertex(kf_v0));
                     if (dca_pos_v0 > Default::Lambda::MaxDCAposV0) continue;
                     /*  */ arm_qt = Math::ArmenterosQt(lv_v0.Vect(), lv_neg.Vect());
                     /*  */ arm_alpha = Math::ArmenterosAlpha(lv_v0.Vect(), lv_neg.Vect(), lv_pos.Vect());
-                    if (arm_qt / TMath::Abs(arm_alpha) > Default::Lambda::MaxArmQtOverAlpha) continue;
+                    /*  */ qt_over_alpha = arm_qt / TMath::Abs(arm_alpha);
+                    if (qt_over_alpha > Default::Lambda::AbsMaxArmQtOverAlpha) continue;
                 }
                 /* -- k0s cuts */
-                if (pdg_v0 == 310) {
+                if (pdg_code_v0 == PdgCode::KaonZeroShort) {
                     if (TMath::Abs(lv_v0.Eta()) > Default::KaonZeroShort::AbsMaxEta) continue;
                     if (lv_v0.Pt() < Default::KaonZeroShort::MinPt) continue;
                     if (lv_v0.M() < Default::KaonZeroShort::MinMass || lv_v0.M() > Default::KaonZeroShort::MaxMass) continue;
-                    if (v3_v0.Rho() < Default::KaonZeroShort::MinRadius || v3_v0.Rho() > 200.) continue;
+                    if (v3_v0.Rho() < Default::KaonZeroShort::MinRadius) continue;      // NOTE: could set upper limit
                     if ((v3_v0 - v3_pv).R() < Default::KaonZeroShort::MinDistFromPV ||  //
                         (v3_v0 - v3_pv).R() > Default::KaonZeroShort::MaxDistFromPV)
                         continue;
                     /*  */ cpa_wrt_pv = Math::CosinePointingAngle(lv_v0.Vect(), v3_v0, v3_pv);
                     if (cpa_wrt_pv < Default::KaonZeroShort::MinCPAwrtPV || cpa_wrt_pv > Default::KaonZeroShort::MaxCPAwrtPV) continue;
-                    /*  */ dca_wrt_pv = TMath::Abs((Double_t)kf_v0.GetDistanceFromVertex(kf_pv));
+                    /*  */ dca_wrt_pv = Math::LinePointDCA(lv_v0.Vect(), v3_v0, v3_pv);
                     if (dca_wrt_pv < Default::KaonZeroShort::MinDCAwrtPV) continue;
-                    /*  */ dca_btw_dau = TMath::Abs((Double_t)kf_neg.GetDistanceFromParticle(kf_pos));
                     if (dca_btw_dau > Default::KaonZeroShort::MaxDCAbtwDau) continue;
-                    /*  */ dca_neg_v0 = TMath::Abs((Double_t)kf_neg.GetDistanceFromVertex(kf_v0));
                     if (dca_neg_v0 > Default::KaonZeroShort::MaxDCAnegV0) continue;
-                    /*  */ dca_pos_v0 = TMath::Abs((Double_t)kf_pos.GetDistanceFromVertex(kf_v0));
                     if (dca_pos_v0 > Default::KaonZeroShort::MaxDCAposV0) continue;
                 }
                 /* store */
                 this_v0.idx = output.size();
                 this_v0.neg = neg;
                 this_v0.pos = pos;
-                this_v0.kf = kf_v0;
-                this_v0.kf_neg = kf_neg;
-                this_v0.kf_pos = kf_pos;
+                this_v0.v3 = v3_v0;
                 this_v0.lv = lv_v0;
                 this_v0.lv_neg = lv_neg;
                 this_v0.lv_pos = lv_pos;
@@ -407,13 +416,13 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos) {
         return output;
     };
     //
-    auto CollectTrueInfo = [pdg_v0, pdg_neg, pdg_pos](const RVec<FoundV0> &found_v0s, cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,
-                                                      RVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal,
-                                                      cRVecU mc_reaction_id) -> RVec<FoundV0_TrueInfo> {
+    auto CollectTrueInfo = [pdg_code_v0, pdg_code_neg, pdg_code_pos](const RVec<FoundV0> &found_v0s, cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,
+                                                                     RVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal,
+                                                                     cRVecU mc_reaction_id) -> RVec<FoundV0_TrueInfo> {
         RVec<FoundV0_TrueInfo> output;
         output.reserve(found_v0s.size());
-        FoundV0_TrueInfo this_v0_mc;
-        for (auto found_v0 : found_v0s) {
+        FoundV0_TrueInfo this_v0_mc{};
+        for (const auto &found_v0 : found_v0s) {
             /* defaults */
             this_v0_mc.entry = -1;
             this_v0_mc.pdg_code = 0;
@@ -431,7 +440,8 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos) {
                 this_v0_mc.entry = mother_mc_entry_[this_v0_mc.neg];
                 this_v0_mc.pdg_code = pdg_code[this_v0_mc.entry];
                 this_v0_mc.is_secondary = mc_is_secondary[this_v0_mc.entry];
-                this_v0_mc.is_true = this_v0_mc.neg_pdg_code == pdg_neg && this_v0_mc.pos_pdg_code == pdg_pos && this_v0_mc.pdg_code == pdg_v0;
+                this_v0_mc.is_true =
+                    this_v0_mc.neg_pdg_code == pdg_code_neg && this_v0_mc.pos_pdg_code == pdg_code_pos && this_v0_mc.pdg_code == pdg_code_v0;
                 if (this_v0_mc.is_true) {
                     this_v0_mc.is_signal = mc_is_signal[this_v0_mc.entry];
                     this_v0_mc.reaction_id = mc_reaction_id[this_v0_mc.entry];
@@ -445,34 +455,53 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_v0, Int_t pdg_neg, Int_t pdg_pos) {
     };
 
     RNode df_V0s =
-        df.Define("Found_" + v0_name, KF_V0Finder,  //
-                  {neg_name + "_TrackEntry_", pos_name + "_TrackEntry_", "Track_Px", "Track_Py", "Track_Pz", "Track_X", "Track_Y", "Track_Z",
-                   "Track_Charge", "Track_Alpha", "Track_Snp", "Track_Tgl", "Track_Signed1Pt", "Track_CovMatrix", "MagneticField", "Event_KF_PV"})
+        df.Define("Found_" + v0_name, KF_V0Finder,                                              //
+                  {neg_name + "_TrackEntry_", pos_name + "_TrackEntry_",                        //
+                   "Track_Px", "Track_Py", "Track_Pz", "Track_X", "Track_Y", "Track_Z",         //
+                   "Track_Charge", "Track_Alpha", "Track_Snp", "Track_Tgl", "Track_Signed1Pt",  //
+                   "Track_CovMatrix", "MagneticField", "Event_PV"})
             .Define(v0_name + "_Neg_TrackEntry", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.neg; }); },
                     {"Found_" + v0_name})
             .Define(v0_name + "_Pos_TrackEntry", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.pos; }); },
                     {"Found_" + v0_name})
+            .Define(v0_name + "_Neg_EsdIdx",
+                    [](const RVec<FoundV0> &v0s, cRVecL track_esd_idx) {
+                        return Map(v0s, [&track_esd_idx](const FoundV0 &v0) { return track_esd_idx[v0.neg]; });
+                    },
+                    {"Found_" + v0_name, "Track_EsdIdx"})
+            .Define(v0_name + "_Pos_EsdIdx",
+                    [](const RVec<FoundV0> &v0s, cRVecL track_esd_idx) {
+                        return Map(v0s, [&track_esd_idx](const FoundV0 &v0) { return track_esd_idx[v0.pos]; });
+                    },
+                    {"Found_" + v0_name, "Track_EsdIdx"})
             .Define(v0_name + "_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Px(); }); },
                     {"Found_" + v0_name})
             .Define(v0_name + "_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Py(); }); },
                     {"Found_" + v0_name})
             .Define(v0_name + "_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Pz(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_E", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.E(); }); },
+            .Define(v0_name + "_Neg_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_neg.Px(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Neg_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_neg.Py(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Neg_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_neg.Pz(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Pos_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_pos.Px(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Pos_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_pos.Py(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Pos_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_pos.Pz(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Xv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.X(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Yv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Y(); }); },
+                    {"Found_" + v0_name})
+            .Define(v0_name + "_Zv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Z(); }); },
                     {"Found_" + v0_name})
             .Define(v0_name + "_Mass", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.M(); }); },
                     {"Found_" + v0_name})  // DEBUG
-            .Define(v0_name + "_Xv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetX(); }); },
-                    {"Found_" + v0_name})
-            .Define(v0_name + "_Yv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetY(); }); },
-                    {"Found_" + v0_name})
-            .Define(v0_name + "_Zv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetZ(); }); },
-                    {"Found_" + v0_name})
-            .Define(v0_name + "_Radius",
-                    [](const RVec<FoundV0> &v0s) {
-                        return Map(v0s, [](const FoundV0 &v0) { return TMath::Sqrt(v0.kf.GetX() * v0.kf.GetX() + v0.kf.GetY() * v0.kf.GetY()); });
-                    },
-                    {"Found_" + v0_name});
+            .Define(v0_name + "_Radius", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Rho(); }); },
+                    {"Found_" + v0_name});  // DEBUG
 
     if (Settings::IsMC) {
         df_V0s =
@@ -582,12 +611,12 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                 // std::cout << "v0b = " << v0b.kf.GetX() << " " << v0b.kf.GetY() << " " << v0b.kf.GetZ() << std::endl;
                 /* geometry */
                 /* -- copy KFParticle objects... */
-                kf_v0a = v0a.kf;
-                kf_v0a_neg = v0a.kf_neg;
-                kf_v0a_pos = v0a.kf_pos;
-                kf_v0b = v0b.kf;
-                kf_v0b_neg = v0b.kf_neg;
-                kf_v0b_pos = v0b.kf_pos;
+                // kf_v0a = v0a.kf;
+                // kf_v0a_neg = v0a.kf_neg;
+                // kf_v0a_pos = v0a.kf_pos;
+                // kf_v0b = v0b.kf;
+                // kf_v0b_neg = v0b.kf_neg;
+                // kf_v0b_pos = v0b.kf_pos;
                 /* (debug) */
                 // std::cout << "v0a (after copy) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << std::endl;
                 // std::cout << "v0b (after copy) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << std::endl;
@@ -596,12 +625,12 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                 kf_sexa.AddDaughter(kf_v0a);
                 kf_sexa.AddDaughter(kf_v0b);
                 kf_sexa.TransportToDecayVertex();
+                if (TMath::IsNaN(kf_sexa.GetX()) || TMath::IsNaN(kf_sexa.GetY()) || TMath::IsNaN(kf_sexa.GetZ())) continue;
                 v3_sexa.SetCoordinates(kf_sexa.GetX(), kf_sexa.GetY(), kf_sexa.GetZ());
-                if (TMath::IsNaN(v3_sexa.R())) continue;
                 /* (debug) */
-                std::cout << "v0a (after added) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << std::endl;
-                std::cout << "v0b (after added) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << std::endl;
-                std::cout << "sexa = " << kf_sexa.GetX() << " " << kf_sexa.GetY() << " " << kf_sexa.GetZ() << std::endl;
+                std::cout << "v0a (after added) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << '\n';
+                std::cout << "v0b (after added) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << '\n';
+                std::cout << "sexa = " << kf_sexa.GetX() << " " << kf_sexa.GetY() << " " << kf_sexa.GetZ() << '\n';
                 /* transport V0s */
                 kf_v0a.SetProductionVertex(kf_sexa);
                 kf_v0b.SetProductionVertex(kf_sexa);
@@ -611,10 +640,10 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                 // std::cout << "v0a (after supposed transport) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << std::endl;
                 // std::cout << "v0b (after supposed transport) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << std::endl;
                 /* transport V0s daughters */
-                kf_v0a_neg = Math::TransportKFParticle(magnetic_field, kf_v0a_neg, kf_v0a_pos, v0a_neg_mass, charge[v0a.neg]);
-                kf_v0a_pos = Math::TransportKFParticle(magnetic_field, kf_v0a_pos, kf_v0a_neg, v0a_pos_mass, charge[v0a.pos]);
-                kf_v0b_neg = Math::TransportKFParticle(magnetic_field, kf_v0b_neg, kf_v0b_pos, pion_mass, charge[v0b.neg]);
-                kf_v0b_pos = Math::TransportKFParticle(magnetic_field, kf_v0b_pos, kf_v0b_neg, pion_mass, charge[v0b.pos]);
+                // kf_v0a_neg = Math::TransportKFParticle(magnetic_field, kf_v0a_neg, kf_v0a_pos, v0a_neg_mass, charge[v0a.neg]);
+                // kf_v0a_pos = Math::TransportKFParticle(magnetic_field, kf_v0a_pos, kf_v0a_neg, v0a_pos_mass, charge[v0a.pos]);
+                // kf_v0b_neg = Math::TransportKFParticle(magnetic_field, kf_v0b_neg, kf_v0b_pos, pion_mass, charge[v0b.neg]);
+                // kf_v0b_pos = Math::TransportKFParticle(magnetic_field, kf_v0b_pos, kf_v0b_neg, pion_mass, charge[v0b.pos]);
                 /* kinematics */
                 lv_v0a_neg.SetCoordinates(kf_v0a_neg.Px(), kf_v0a_neg.Py(), kf_v0a_neg.Pz(), v0a_neg_mass);
                 lv_v0a_pos.SetCoordinates(kf_v0a_pos.Px(), kf_v0a_pos.Py(), kf_v0a_pos.Pz(), v0a_pos_mass);
@@ -638,8 +667,7 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                 /* (debug) */
                 std::cout << "radius=" << radius << " rapidity=" << rapidity << " cpa_wrt_pv=" << cpa_wrt_pv << " dca_la_sv=" << dca_la_sv
                           << " dca_la_neg_sv=" << dca_la_neg_sv << " dca_la_pos_sv=" << dca_la_pos_sv << " dca_k0s_sv=" << dca_k0s_sv
-                          << " dca_k0s_neg_sv=" << dca_k0s_neg_sv << " dca_k0s_pos_sv=" << dca_k0s_pos_sv << " dca_btw_v0s=" << dca_btw_v0s
-                          << std::endl;
+                          << " dca_k0s_neg_sv=" << dca_k0s_neg_sv << " dca_k0s_pos_sv=" << dca_k0s_pos_sv << " dca_btw_v0s=" << dca_btw_v0s << '\n';
                 /* cuts */
                 if (radius < Default::ChannelA::MinRadius || radius > 200.) continue;
                 if (TMath::Abs(rapidity) > Default::ChannelA::AbsMaxRapidity) continue;
@@ -651,7 +679,7 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                 if (dca_k0s_neg_sv > Default::ChannelA::MaxDCAK0NegSV) continue;
                 if (dca_k0s_pos_sv > Default::ChannelA::MaxDCAK0PosSV) continue;
                 if (dca_btw_v0s > Default::ChannelA::MaxDCAbtwV0s) continue;
-                std::cout << "a candidate passed all cuts!" << std::endl;
+                std::cout << "a candidate passed all cuts!" << '\n';
                 /* store */
                 this_sexa.v0a = v0a;
                 this_sexa.v0b = v0b;
@@ -668,10 +696,10 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
                               const RVec<FoundV0_TrueInfo> &v0b_mc) -> RVec<TypeA_TrueInfo> {
         RVec<TypeA_TrueInfo> output;
         output.reserve(found.size());
-        TypeA_TrueInfo this_sexa_mc;
+        TypeA_TrueInfo this_sexa_mc{};
         /* auxiliar vars */
         Bool_t same_reaction_id;
-        for (auto found_sexa : found) {
+        for (const auto &found_sexa : found) {
             /* defaults */
             this_sexa_mc.reaction_id = 0;
             this_sexa_mc.is_signal = false;
@@ -855,39 +883,40 @@ void Manager::PrintAll(RNode df) {
     // --- //
     size_t n_events = n_tracks->size();
     for (size_t event_i = 0; event_i < n_events; event_i++) {
-        std::cout << "# Event " << event_i << std::endl;
+        std::cout << "# Event " << event_i << '\n';
         // --- //
-        std::cout << "## Summary" << std::endl;
+        std::cout << "## Summary" << '\n';
         printf(">> N Injected = %lu\n", (*n_injected)[event_i]);
         printf(">> N Findable Sexaquarks = %d\n", Sum((*ev_injected_is_findable)[event_i]));
         printf(">> N MC = %lu\n", n_mc->at(event_i));
         printf(">> N Findable V0s = %d\n", Sum((*ev_mc_truev0_isfindable)[event_i]));
         // --- //
-        std::cout << "## (MC) Particles" << std::endl;
+        std::cout << "## (MC) Particles" << '\n';
         for (size_t mc_entry = 0; mc_entry < (*n_mc)[event_i]; mc_entry++) {
             printf("mc_entry=%lu, pdg_code=%d, ancestor_entry=%ld, mother_entry=%ld, neg_entry=%ld, pos_entry=%ld\n",  //
                    mc_entry, (*ev_mc_pdgcode)[event_i][mc_entry], (*ev_mc_ancestor_entry)[event_i][mc_entry],
                    (*ev_mc_mother_entry)[event_i][mc_entry], (*ev_mc_neg_entry)[event_i][mc_entry], (*ev_mc_pos_entry)[event_i][mc_entry]);
         }
         // --- //
-        std::cout << "## (MC) V0s" << std::endl;
+        std::cout << "## (MC) V0s" << '\n';
         for (size_t mc_entry = 0; mc_entry < (*n_mc)[event_i]; mc_entry++) {
-            if (!((*ev_mc_pdgcode)[event_i][mc_entry] == 310 || TMath::Abs((*ev_mc_pdgcode)[event_i][mc_entry]) == 3122)) continue;
+            if (((*ev_mc_pdgcode)[event_i][mc_entry] != PdgCode::KaonZeroShort && TMath::Abs((*ev_mc_pdgcode)[event_i][mc_entry]) != PdgCode::Lambda))
+                continue;
             printf("mc_entry=%lu, pdg_code=%d, is_signal=%d, neg_entry=%ld, pos_entry=%ld, neg_gt=%d, pos_gt=%d, neg_pdg=%d, pos_pdg=%d, xv=%f\n",
                    mc_entry, (*ev_mc_pdgcode)[event_i][mc_entry], (*ev_mc_is_signal)[event_i][mc_entry], (*ev_mc_neg_entry)[event_i][mc_entry],
                    (*ev_mc_pos_entry)[event_i][mc_entry], (*ev_mc_neg_gottracked)[event_i][mc_entry], (*ev_mc_pos_gottracked)[event_i][mc_entry],
                    (*ev_mc_neg_pdgcode)[event_i][mc_entry], (*ev_mc_pos_pdgcode)[event_i][mc_entry], (*ev_mc_xv)[event_i][mc_entry]);
         }
         // --- //
-        std::cout << "## (MC) Charged Particles" << std::endl;
+        std::cout << "## (MC) Charged Particles" << '\n';
         for (size_t mc_entry = 0; mc_entry < (*n_mc)[event_i]; mc_entry++) {
-            if (!(*ev_mc_is_charged)[event_i][mc_entry]) continue;
+            if ((*ev_mc_is_charged)[event_i][mc_entry] == 0) continue;
             printf("mc_entry=%ld, pdg_code=%d, is_signal=%d, mother_entry=%ld, mother_pdg=%d, got_tracked=%d\n",  //
                    mc_entry, (*ev_mc_pdgcode)[event_i][mc_entry], (*ev_mc_is_signal)[event_i][mc_entry], (*ev_mc_mother_entry)[event_i][mc_entry],
                    (*ev_mc_mother_pdgcode)[event_i][mc_entry], (*ev_mc_got_tracked)[event_i][mc_entry]);
         }
         // --- //
-        std::cout << "## Injected" << std::endl;
+        std::cout << "## Injected" << '\n';
         for (size_t inj_entry = 0; inj_entry < (*n_injected)[event_i]; inj_entry++) {
             printf("reaction_id=%d, radius=%f, pt_after_reaction=%f, is_findable=%d\n",  //
                    (*ev_injected_reaction_id)[event_i][inj_entry], (*ev_injected_radius)[event_i][inj_entry],
@@ -898,7 +927,7 @@ void Manager::PrintAll(RNode df) {
             }
         }
         // --- //
-        std::cout << "## Tracks" << std::endl;
+        std::cout << "## Tracks" << '\n';
         for (size_t track_entry = 0; track_entry < (*n_tracks)[event_i]; track_entry++) {
             printf("track_entry=%ld, mc_entry=%lu, nsigmaproton=%f, nsigmapion=%f, pdg_code=%d, is_signal=%d\n",  //
                    track_entry, (*ev_track_mc_entry)[event_i][track_entry], (*ev_track_nsigmaproton)[event_i][track_entry],
@@ -912,10 +941,14 @@ void Manager::PrintAll(RNode df) {
 void Manager::EndOfAnalysis(RNode df) {
     std::vector<std::string> column_list;
     /* Add V0s Properties */
-    for (auto v0_name : fAnalyzed_V0sNames) {
-        column_list.insert(column_list.end(),
-                           {v0_name + "_Neg_TrackEntry", v0_name + "_Pos_TrackEntry", v0_name + "_Px", v0_name + "_Py", v0_name + "_Pz",
-                            v0_name + "_E", v0_name + "_Mass", v0_name + "_Xv", v0_name + "_Yv", v0_name + "_Zv", v0_name + "_Radius"});
+    for (const auto &v0_name : fAnalyzed_V0sNames) {
+        column_list.insert(column_list.end(), {v0_name + "_Neg_TrackEntry", v0_name + "_Pos_TrackEntry",       //
+                                               v0_name + "_Neg_EsdIdx", v0_name + "_Pos_EsdIdx",               //
+                                               v0_name + "_Px", v0_name + "_Py", v0_name + "_Pz",              //
+                                               v0_name + "_Neg_Px", v0_name + "_Neg_Py", v0_name + "_Neg_Pz",  //
+                                               v0_name + "_Pos_Px", v0_name + "_Pos_Py", v0_name + "_Pos_Pz",  //
+                                               v0_name + "_Xv", v0_name + "_Yv", v0_name + "_Zv",              //
+                                               v0_name + "_Mass", v0_name + "_Radius"});
         if (Settings::IsMC) {
             column_list.insert(column_list.end(), {v0_name + "_Neg_McEntry", v0_name + "_Pos_McEntry", v0_name + "_McEntry", v0_name + "_PdgCode",
                                                    v0_name + "_Neg_PdgCode", v0_name + "_Pos_PdgCode", v0_name + "_IsTrue", v0_name + "_IsSignal",
@@ -923,6 +956,7 @@ void Manager::EndOfAnalysis(RNode df) {
         }
     }
     /* Add (Anti)Sexaquarks Properties */
+    /*
     std::string sexaquark_name = "ASA";
     column_list.insert(column_list.end(), {sexaquark_name + "_Mass", sexaquark_name + "_Pt", sexaquark_name + "_Xv", sexaquark_name + "_Yv",
                                            sexaquark_name + "_Radius"});
@@ -932,12 +966,12 @@ void Manager::EndOfAnalysis(RNode df) {
                             sexaquark_name + "_V0b_Pos_McEntry", sexaquark_name + "_V0a_McEntry", sexaquark_name + "_V0b_McEntry",
                             sexaquark_name + "_IsSignal", sexaquark_name + "_ReactionID", sexaquark_name + "_IsHybrid"});
     }
+    */
     /* Write to disk */
     df.Snapshot("Events", Settings::PathOutputFile, column_list);
-    /* Print info */
     InfoF("TFile %s has been written", Settings::PathOutputFile.c_str());
+    /* Print info */
     InfoF("NRuns = %u", df.GetNRuns());
 }
 
-}  // namespace Analysis
-}  // namespace Tree2Sexaquark
+}  // namespace Tree2Sexaquark::Analysis

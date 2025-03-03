@@ -5,13 +5,10 @@
 
 namespace Tree2Sexaquark {
 
-/*
- *
- */
 class Parser {
    public:
     Parser();
-    Parser(std::string app_description);
+    explicit Parser(std::string app_description);
     ~Parser() = default;
     int Parse(int argc, char* argv[]);
     int ExitCode;
