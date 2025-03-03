@@ -292,6 +292,151 @@ RNode Manager::ProcessTracks(RNode df) {
 /**  V0s  **/
 /*** === ***/
 
+RVec<FoundV0> Manager::V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,                //
+                                     cRVecUL entries_neg_, cRVecUL entries_pos_,                             //
+                                     cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
+                                     cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
+                                     const RVec<RVecF> &cov_matrix,                                          //
+                                     const Float_t &magnetic_field, const XYZPoint &v3_pv) {
+    RVec<FoundV0> output;
+    FoundV0 this_v0;
+    /* protection */
+    if (!entries_neg_.size() || !entries_pos_.size()) return output;
+    /* one-time definitions */
+    KFParticle::SetField(magnetic_field);
+    /* main vars */
+    PxPyPzMVector lv_v0, lv_neg, lv_pos;
+    /* loop over all pairs */
+    for (auto neg : entries_neg_) {
+        for (auto pos : entries_pos_) {
+            /* sanity check */
+            if (neg == pos) continue;
+            /* geometry */
+            KFParticle kf_neg = Math::CreateKFParticle(px[neg], py[neg], pz[neg], x[neg], y[neg], z[neg],            //
+                                                       charge[neg], alpha[neg], snp[neg], tgl[neg], signed1pt[neg],  //
+                                                       cov_matrix[neg], neg_mass);
+            KFParticle kf_pos = Math::CreateKFParticle(px[pos], py[pos], pz[pos], x[pos], y[pos], z[pos],            //
+                                                       charge[pos], alpha[pos], snp[pos], tgl[pos], signed1pt[pos],  //
+                                                       cov_matrix[pos], pos_mass);
+            KFParticle kf_v0;
+            kf_v0.AddDaughter(kf_neg);
+            kf_v0.AddDaughter(kf_pos);
+            kf_v0.TransportToDecayVertex();
+            /* transport */
+            kf_neg.SetProductionVertex(kf_v0);
+            kf_pos.SetProductionVertex(kf_v0);
+            kf_neg.TransportToProductionVertex();
+            kf_pos.TransportToProductionVertex();
+            /* kinematics */
+            lv_neg.SetCoordinates(kf_neg.Px(), kf_neg.Py(), kf_neg.Pz(), neg_mass);
+            lv_pos.SetCoordinates(kf_pos.Px(), kf_pos.Py(), kf_pos.Pz(), pos_mass);
+            lv_v0 = lv_neg + lv_pos;
+            /* fill struct */
+            this_v0.idx = output.size();
+            this_v0.neg = neg;
+            this_v0.pos = pos;
+            this_v0.kf = kf_v0;
+            this_v0.kf_neg = kf_neg;
+            this_v0.kf_pos = kf_pos;
+            this_v0.lv = lv_v0;
+            this_v0.lv_neg = lv_neg;
+            this_v0.lv_pos = lv_pos;
+            /* apply cuts and store */
+            if (!V0s_PassesCuts(pdg_code_v0, this_v0, v3_pv)) continue;
+            output.push_back(this_v0);
+        }  // end of loop over pos
+    }      // end of loop over neg
+    return output;
+};
+
+RVec<FoundV0_TrueInfo> Manager::V0s_TrueInfoCollector(Int_t pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
+                                                      const RVec<FoundV0> &found_v0s,                                   //
+                                                      cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,                 //
+                                                      cRVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal, cRVecU mc_reaction_id) {
+    RVec<FoundV0_TrueInfo> output;
+    output.reserve(found_v0s.size());
+    FoundV0_TrueInfo this_v0_mc{};
+    for (const auto &found_v0 : found_v0s) {
+        /* defaults */
+        this_v0_mc.entry = -1;
+        this_v0_mc.pdg_code = 0;
+        this_v0_mc.is_secondary = false;
+        this_v0_mc.is_true = false;
+        this_v0_mc.is_signal = false;
+        this_v0_mc.reaction_id = 0;
+        /* fill values */
+        this_v0_mc.neg = track_mc_entry_[found_v0.neg];
+        this_v0_mc.pos = track_mc_entry_[found_v0.pos];
+        this_v0_mc.neg_pdg_code = pdg_code[this_v0_mc.neg];
+        this_v0_mc.pos_pdg_code = pdg_code[this_v0_mc.pos];
+        this_v0_mc.same_mother = mother_mc_entry_[this_v0_mc.neg] == mother_mc_entry_[this_v0_mc.pos];
+        if (this_v0_mc.same_mother) {
+            this_v0_mc.entry = mother_mc_entry_[this_v0_mc.neg];
+            this_v0_mc.pdg_code = pdg_code[this_v0_mc.entry];
+            this_v0_mc.is_secondary = (Bool_t)mc_is_secondary[this_v0_mc.entry];
+            this_v0_mc.is_true =
+                this_v0_mc.neg_pdg_code == pdg_code_neg && this_v0_mc.pos_pdg_code == pdg_code_pos && this_v0_mc.pdg_code == pdg_code_v0;
+            if (this_v0_mc.is_true) {
+                this_v0_mc.is_signal = (Bool_t)mc_is_signal[this_v0_mc.entry];
+                this_v0_mc.reaction_id = mc_reaction_id[this_v0_mc.entry];
+            }
+        }
+        this_v0_mc.is_hybrid = !this_v0_mc.is_signal && ((mc_is_signal[this_v0_mc.neg] && !mc_is_signal[this_v0_mc.pos]) ||
+                                                         (!mc_is_signal[this_v0_mc.neg] && mc_is_signal[this_v0_mc.pos]));
+        output.emplace_back(this_v0_mc);
+    }
+    return output;
+};
+
+Bool_t Manager::V0s_PassesCuts(Int_t pdg_code_v0, const FoundV0 &v0, const XYZPoint &v3_pv) {
+    //
+    XYZPoint v3_v0(v0.kf.GetX(), v0.kf.GetY(), v0.kf.GetZ());
+    /* -- (anti)lambda cuts */
+    if (TMath::Abs(pdg_code_v0) == PdgCode::Lambda) {
+        if (TMath::Abs(v0.lv.Eta()) > Default::Lambda::AbsMaxEta) return kFALSE;
+        if (v0.lv.Pt() < Default::Lambda::MinPt) return kFALSE;
+        if (v0.lv.M() < Default::Lambda::MinMass || v0.lv.M() > Default::Lambda::MaxMass) return kFALSE;
+        if (v3_v0.Rho() < Default::Lambda::MinRadius) return kFALSE;  // NOTE: could set upper limit
+        if ((v3_v0 - v3_pv).R() < Default::Lambda::MinDistFromPV) return kFALSE;
+        /*  */ Double_t cpa_wrt_pv = Math::CosinePointingAngle(v0.lv.Vect(), v3_v0, v3_pv);
+        if (cpa_wrt_pv < Default::Lambda::MinCPAwrtPV || cpa_wrt_pv > Default::Lambda::MaxCPAwrtPV) return kFALSE;
+        /*  */ Double_t dca_wrt_pv = Math::LinePointDCA(v0.lv.Vect(), v3_v0, v3_pv);
+        if (dca_wrt_pv < Default::Lambda::MinDCAwrtPV) return kFALSE;
+        /*  */ Double_t dca_btw_dau = TMath::Abs((Double_t)v0.kf_neg.GetDistanceFromParticle(v0.kf_pos));
+        if (dca_btw_dau > Default::Lambda::MaxDCAbtwDau) return kFALSE;
+        /*  */ Double_t dca_neg_v0 = TMath::Abs((Double_t)v0.kf_neg.GetDistanceFromVertex(v0.kf));
+        if (dca_neg_v0 > Default::Lambda::MaxDCAnegV0) return kFALSE;
+        /*  */ Double_t dca_pos_v0 = TMath::Abs((Double_t)v0.kf_pos.GetDistanceFromVertex(v0.kf));
+        if (dca_pos_v0 > Default::Lambda::MaxDCAposV0) return kFALSE;
+        /*  */ Double_t arm_qt = Math::ArmenterosQt(v0.lv.Vect(), v0.lv_neg.Vect());
+        /*  */ Double_t arm_alpha = Math::ArmenterosAlpha(v0.lv.Vect(), v0.lv_neg.Vect(), v0.lv_pos.Vect());
+        /*  */ Double_t qt_over_alpha = arm_qt / TMath::Abs(arm_alpha);
+        if (qt_over_alpha > Default::Lambda::AbsMaxArmQtOverAlpha) return kFALSE;
+    }
+    /* -- k0s cuts */
+    if (pdg_code_v0 == PdgCode::KaonZeroShort) {
+        if (TMath::Abs(v0.lv.Eta()) > Default::KaonZeroShort::AbsMaxEta) return kFALSE;
+        if (v0.lv.Pt() < Default::KaonZeroShort::MinPt) return kFALSE;
+        if (v0.lv.M() < Default::KaonZeroShort::MinMass || v0.lv.M() > Default::KaonZeroShort::MaxMass) return kFALSE;
+        if (v3_v0.Rho() < Default::KaonZeroShort::MinRadius) return kFALSE;  // NOTE: could set upper limit
+        if ((v3_v0 - v3_pv).R() < Default::KaonZeroShort::MinDistFromPV ||   //
+            (v3_v0 - v3_pv).R() > Default::KaonZeroShort::MaxDistFromPV)
+            return kFALSE;
+        /*  */ Double_t cpa_wrt_pv = Math::CosinePointingAngle(v0.lv.Vect(), v3_v0, v3_pv);
+        if (cpa_wrt_pv < Default::KaonZeroShort::MinCPAwrtPV || cpa_wrt_pv > Default::KaonZeroShort::MaxCPAwrtPV) return kFALSE;
+        /*  */ Double_t dca_wrt_pv = Math::LinePointDCA(v0.lv.Vect(), v3_v0, v3_pv);
+        if (dca_wrt_pv < Default::KaonZeroShort::MinDCAwrtPV) return kFALSE;
+        /*  */ Double_t dca_btw_dau = TMath::Abs((Double_t)v0.kf_neg.GetDistanceFromParticle(v0.kf_pos));
+        if (dca_btw_dau > Default::KaonZeroShort::MaxDCAbtwDau) return kFALSE;
+        /*  */ Double_t dca_neg_v0 = TMath::Abs((Double_t)v0.kf_neg.GetDistanceFromVertex(v0.kf));
+        if (dca_neg_v0 > Default::KaonZeroShort::MaxDCAnegV0) return kFALSE;
+        /*  */ Double_t dca_pos_v0 = TMath::Abs((Double_t)v0.kf_pos.GetDistanceFromVertex(v0.kf));
+        if (dca_pos_v0 > Default::KaonZeroShort::MaxDCAposV0) return kFALSE;
+    }
+    /*  */
+    return kTRUE;
+}
+
 /*
  * Find all V0s via Kalman Filter.
  */
@@ -316,146 +461,24 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pd
     }
     fAnalyzed_V0sNames.push_back(v0_name);
     //
-    auto KF_V0Finder = [pdg_code_v0, neg_mass, pos_mass](cRVecUL entries_neg_, cRVecUL entries_pos_,                            //
-                                                         cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,         //
-                                                         RVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
-                                                         const RVec<RVecF> &cov_matrix,                                         //
-                                                         const Float_t &magnetic_field, const XYZPoint &v3_pv) -> RVec<FoundV0> {
-        RVec<FoundV0> output;
-        FoundV0 this_v0;
-        /* protection */
-        if (!entries_neg_.size() || !entries_pos_.size()) return output;
-        /* one-time definitions */
-        KFParticle::SetField(magnetic_field);
-        /* main vars */
-        XYZPoint v3_v0;
-        PxPyPzMVector lv_neg;
-        PxPyPzMVector lv_pos;
-        PxPyPzMVector lv_v0;
-        /* auxiliary vars */
-        Double_t cpa_wrt_pv, dca_wrt_pv;
-        Double_t dca_btw_dau, dca_neg_v0, dca_pos_v0;
-        Double_t arm_qt, arm_alpha, qt_over_alpha;
-        /* loop over all pairs */
-        for (auto neg : entries_neg_) {
-            for (auto pos : entries_pos_) {
-                /* sanity check */
-                if (neg == pos) continue;
-                /* geometry */
-                KFParticle kf_neg = Math::CreateKFParticle(px[neg], py[neg], pz[neg], x[neg], y[neg], z[neg],            //
-                                                           charge[neg], alpha[neg], snp[neg], tgl[neg], signed1pt[neg],  //
-                                                           cov_matrix[neg], neg_mass);
-                KFParticle kf_pos = Math::CreateKFParticle(px[pos], py[pos], pz[pos], x[pos], y[pos], z[pos],            //
-                                                           charge[pos], alpha[pos], snp[pos], tgl[pos], signed1pt[pos],  //
-                                                           cov_matrix[pos], pos_mass);
-                KFParticle kf_v0;
-                kf_v0.AddDaughter(kf_neg);
-                kf_v0.AddDaughter(kf_pos);
-                kf_v0.TransportToDecayVertex();
-                v3_v0.SetCoordinates(kf_v0.GetX(), kf_v0.GetY(), kf_v0.GetZ());
-                /* transport */
-                kf_neg.SetProductionVertex(kf_v0);     // TEST
-                kf_pos.SetProductionVertex(kf_v0);     // TEST
-                kf_neg.TransportToProductionVertex();  // TEST
-                kf_pos.TransportToProductionVertex();  // TEST
-                /* kinematics */
-                lv_neg.SetCoordinates(kf_neg.Px(), kf_neg.Py(), kf_neg.Pz(), neg_mass);
-                lv_pos.SetCoordinates(kf_pos.Px(), kf_pos.Py(), kf_pos.Pz(), pos_mass);
-                lv_v0 = lv_neg + lv_pos;
-                /* calculate vars */
-                dca_btw_dau = TMath::Abs((Double_t)kf_neg.GetDistanceFromParticle(kf_pos));
-                dca_neg_v0 = TMath::Abs((Double_t)kf_neg.GetDistanceFromVertex(kf_v0));
-                dca_pos_v0 = TMath::Abs((Double_t)kf_pos.GetDistanceFromVertex(kf_v0));
-                /* -- (anti)lambda cuts */
-                if (TMath::Abs(pdg_code_v0) == PdgCode::Lambda) {
-                    if (TMath::Abs(lv_v0.Eta()) > Default::Lambda::AbsMaxEta) continue;
-                    if (lv_v0.Pt() < Default::Lambda::MinPt) continue;
-                    if (lv_v0.M() < Default::Lambda::MinMass || lv_v0.M() > Default::Lambda::MaxMass) continue;
-                    if (v3_v0.Rho() < Default::Lambda::MinRadius) continue;  // NOTE: could set upper limit
-                    if ((v3_v0 - v3_pv).R() < Default::Lambda::MinDistFromPV) continue;
-                    /*  */ cpa_wrt_pv = Math::CosinePointingAngle(lv_v0.Vect(), v3_v0, v3_pv);
-                    if (cpa_wrt_pv < Default::Lambda::MinCPAwrtPV || cpa_wrt_pv > Default::Lambda::MaxCPAwrtPV) continue;
-                    /*  */ dca_wrt_pv = Math::LinePointDCA(lv_v0.Vect(), v3_v0, v3_pv);
-                    if (dca_wrt_pv < Default::Lambda::MinDCAwrtPV) continue;
-                    if (dca_btw_dau > Default::Lambda::MaxDCAbtwDau) continue;
-                    if (dca_neg_v0 > Default::Lambda::MaxDCAnegV0) continue;
-                    if (dca_pos_v0 > Default::Lambda::MaxDCAposV0) continue;
-                    /*  */ arm_qt = Math::ArmenterosQt(lv_v0.Vect(), lv_neg.Vect());
-                    /*  */ arm_alpha = Math::ArmenterosAlpha(lv_v0.Vect(), lv_neg.Vect(), lv_pos.Vect());
-                    /*  */ qt_over_alpha = arm_qt / TMath::Abs(arm_alpha);
-                    if (qt_over_alpha > Default::Lambda::AbsMaxArmQtOverAlpha) continue;
-                }
-                /* -- k0s cuts */
-                if (pdg_code_v0 == PdgCode::KaonZeroShort) {
-                    if (TMath::Abs(lv_v0.Eta()) > Default::KaonZeroShort::AbsMaxEta) continue;
-                    if (lv_v0.Pt() < Default::KaonZeroShort::MinPt) continue;
-                    if (lv_v0.M() < Default::KaonZeroShort::MinMass || lv_v0.M() > Default::KaonZeroShort::MaxMass) continue;
-                    if (v3_v0.Rho() < Default::KaonZeroShort::MinRadius) continue;      // NOTE: could set upper limit
-                    if ((v3_v0 - v3_pv).R() < Default::KaonZeroShort::MinDistFromPV ||  //
-                        (v3_v0 - v3_pv).R() > Default::KaonZeroShort::MaxDistFromPV)
-                        continue;
-                    /*  */ cpa_wrt_pv = Math::CosinePointingAngle(lv_v0.Vect(), v3_v0, v3_pv);
-                    if (cpa_wrt_pv < Default::KaonZeroShort::MinCPAwrtPV || cpa_wrt_pv > Default::KaonZeroShort::MaxCPAwrtPV) continue;
-                    /*  */ dca_wrt_pv = Math::LinePointDCA(lv_v0.Vect(), v3_v0, v3_pv);
-                    if (dca_wrt_pv < Default::KaonZeroShort::MinDCAwrtPV) continue;
-                    if (dca_btw_dau > Default::KaonZeroShort::MaxDCAbtwDau) continue;
-                    if (dca_neg_v0 > Default::KaonZeroShort::MaxDCAnegV0) continue;
-                    if (dca_pos_v0 > Default::KaonZeroShort::MaxDCAposV0) continue;
-                }
-                /* store */
-                this_v0.idx = output.size();
-                this_v0.neg = neg;
-                this_v0.pos = pos;
-                this_v0.v3 = v3_v0;
-                this_v0.lv = lv_v0;
-                this_v0.lv_neg = lv_neg;
-                this_v0.lv_pos = lv_pos;
-                output.push_back(this_v0);
-            }  // end of loop over pos
-        }      // end of loop over neg
-        return output;
+    auto CallV0Finder = [pdg_code_v0, neg_mass, pos_mass](cRVecUL entries_neg_, cRVecUL entries_pos_,                             //
+                                                          cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
+                                                          cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
+                                                          const RVec<RVecF> &cov_matrix,                                          //
+                                                          const Float_t &magnetic_field, const XYZPoint &v3_pv) -> RVec<FoundV0> {
+        return V0s_KF_Finder(pdg_code_v0, neg_mass, pos_mass,  //
+                             entries_neg_, entries_pos_, px, py, pz, x, y, z, charge, alpha, snp, tgl, signed1pt, cov_matrix, magnetic_field, v3_pv);
     };
     //
-    auto CollectTrueInfo = [pdg_code_v0, pdg_code_neg, pdg_code_pos](const RVec<FoundV0> &found_v0s, cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,
-                                                                     RVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal,
-                                                                     cRVecU mc_reaction_id) -> RVec<FoundV0_TrueInfo> {
-        RVec<FoundV0_TrueInfo> output;
-        output.reserve(found_v0s.size());
-        FoundV0_TrueInfo this_v0_mc{};
-        for (const auto &found_v0 : found_v0s) {
-            /* defaults */
-            this_v0_mc.entry = -1;
-            this_v0_mc.pdg_code = 0;
-            this_v0_mc.is_secondary = false;
-            this_v0_mc.is_true = false;
-            this_v0_mc.is_signal = false;
-            this_v0_mc.reaction_id = 0;
-            /* fill values */
-            this_v0_mc.neg = track_mc_entry_[found_v0.neg];
-            this_v0_mc.pos = track_mc_entry_[found_v0.pos];
-            this_v0_mc.neg_pdg_code = pdg_code[this_v0_mc.neg];
-            this_v0_mc.pos_pdg_code = pdg_code[this_v0_mc.pos];
-            this_v0_mc.same_mother = mother_mc_entry_[this_v0_mc.neg] == mother_mc_entry_[this_v0_mc.pos];
-            if (this_v0_mc.same_mother) {
-                this_v0_mc.entry = mother_mc_entry_[this_v0_mc.neg];
-                this_v0_mc.pdg_code = pdg_code[this_v0_mc.entry];
-                this_v0_mc.is_secondary = mc_is_secondary[this_v0_mc.entry];
-                this_v0_mc.is_true =
-                    this_v0_mc.neg_pdg_code == pdg_code_neg && this_v0_mc.pos_pdg_code == pdg_code_pos && this_v0_mc.pdg_code == pdg_code_v0;
-                if (this_v0_mc.is_true) {
-                    this_v0_mc.is_signal = mc_is_signal[this_v0_mc.entry];
-                    this_v0_mc.reaction_id = mc_reaction_id[this_v0_mc.entry];
-                }
-            }
-            this_v0_mc.is_hybrid = !this_v0_mc.is_signal && ((mc_is_signal[this_v0_mc.neg] && !mc_is_signal[this_v0_mc.pos]) ||
-                                                             (!mc_is_signal[this_v0_mc.neg] && mc_is_signal[this_v0_mc.pos]));
-            output.emplace_back(this_v0_mc);
-        }
-        return output;
+    auto CallTrueCollector = [pdg_code_v0, pdg_code_neg, pdg_code_pos](const RVec<FoundV0> &found_v0s, cRVecUL track_mc_entry_,
+                                                                       cRVecL mother_mc_entry_, cRVecI pdg_code, cRVecI mc_is_secondary,
+                                                                       cRVecI mc_is_signal, cRVecU mc_reaction_id) -> RVec<FoundV0_TrueInfo> {
+        return V0s_TrueInfoCollector(pdg_code_v0, pdg_code_neg, pdg_code_pos, found_v0s, track_mc_entry_, mother_mc_entry_, pdg_code, mc_is_secondary,
+                                     mc_is_signal, mc_reaction_id);
     };
 
     RNode df_V0s =
-        df.Define("Found_" + v0_name, KF_V0Finder,                                              //
+        df.Define("Found_" + v0_name, CallV0Finder,                                             //
                   {neg_name + "_TrackEntry_", pos_name + "_TrackEntry_",                        //
                    "Track_Px", "Track_Py", "Track_Pz", "Track_X", "Track_Y", "Track_Z",         //
                    "Track_Charge", "Track_Alpha", "Track_Snp", "Track_Tgl", "Track_Signed1Pt",  //
@@ -492,21 +515,24 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pd
                     {"Found_" + v0_name})
             .Define(v0_name + "_Pos_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv_pos.Pz(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Xv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.X(); }); },
+            .Define(v0_name + "_Xv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetX(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Yv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Y(); }); },
+            .Define(v0_name + "_Yv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetY(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Zv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Z(); }); },
+            .Define(v0_name + "_Zv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetZ(); }); },
                     {"Found_" + v0_name})
             .Define(v0_name + "_Mass", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.M(); }); },
                     {"Found_" + v0_name})  // DEBUG
-            .Define(v0_name + "_Radius", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.v3.Rho(); }); },
+            .Define(v0_name + "_Radius",
+                    [](const RVec<FoundV0> &v0s) {
+                        return Map(v0s, [](const FoundV0 &v0) { return TMath::Sqrt(v0.kf.GetX() * v0.kf.GetX() + v0.kf.GetY() * v0.kf.GetY()); });
+                    },
                     {"Found_" + v0_name});  // DEBUG
 
     if (Settings::IsMC) {
         df_V0s =
             df_V0s  //
-                .Define(v0_name + "_TrueInfo", CollectTrueInfo,
+                .Define(v0_name + "_TrueInfo", CallTrueCollector,
                         {"Found_" + v0_name, "Track_McEntry_", "MC_Mother_McEntry_", "MC_PdgCode", "MC_IsSecondary", "MC_IsSignal", "MC_ReactionID"})
                 .Define(v0_name + "_Neg_McEntry",
                         [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.neg; }); },
@@ -550,177 +576,133 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pd
 /**  Sexaquarks  **/
 /*** ========== ***/
 
+RVec<TypeA> Manager::TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<FoundV0> &found_v0b,  //
+                                     const Float_t &magnetic_field, const KFVertex &kf_pv) {
+    //
+    const Double_t neutron_mass = TDatabasePDG::Instance()->GetParticle(PdgCode::Neutron)->Mass();
+    //
+    RVec<TypeA> output;
+    TypeA this_sexa;
+    /* protection */
+    if (!found_v0a.size() || !found_v0b.size()) return output;
+    /* one-time definitions */
+    KFParticle::SetField(magnetic_field);
+    PxPyPzMVector lv_struck_neutron(0., 0., 0., neutron_mass);
+    /* useful vars */
+    KFVertex copy_kf_pv;
+    KFParticle kf_v0a, kf_v0b;
+    PxPyPzMVector lv_sexa, lv_v0a, lv_v0b;
+    PxPyPzMVector lv_sexa_asdecay;
+    for (const auto &v0a : found_v0a) {
+        for (const auto &v0b : found_v0b) {
+            /* sanity check */
+            std::set<ULong64_t> unique_track_entries = {v0a.neg, v0a.pos, v0b.neg, v0b.pos};
+            if (unique_track_entries.size() != 4) continue;
+            /* geometry */
+            copy_kf_pv = kf_pv;
+            kf_v0a = v0a.kf;
+            kf_v0b = v0b.kf;
+            KFParticle kf_sexa;
+            kf_sexa.AddDaughter(kf_v0a);
+            kf_sexa.AddDaughter(kf_v0b);
+            /* transport */
+            kf_sexa.SetProductionVertex(copy_kf_pv);
+            kf_sexa.TransportToDecayVertex();
+            //
+            kf_v0a.SetProductionVertex(kf_sexa);
+            kf_v0b.SetProductionVertex(kf_sexa);
+            kf_v0a.TransportToProductionVertex();
+            kf_v0b.TransportToProductionVertex();
+            /* kinematics */
+            lv_v0a.SetCoordinates(kf_v0a.Px(), kf_v0a.Py(), kf_v0a.Pz(), kf_v0a.E());
+            lv_v0b.SetCoordinates(kf_v0b.Px(), kf_v0b.Py(), kf_v0b.Pz(), kf_v0b.E());
+            lv_sexa = lv_v0a + lv_v0b - lv_struck_neutron;
+            lv_sexa_asdecay = lv_v0a + lv_v0b;
+            /* fill struct */
+            this_sexa.v0a = v0a;
+            this_sexa.v0b = v0b;
+            this_sexa.kf = kf_sexa;
+            this_sexa.lv = lv_sexa;
+            this_sexa.lv_asdecay = lv_sexa_asdecay;
+
+            output.push_back(this_sexa);
+        }  // end of loop over k0s
+    }      // end of loop over (anti)lambdas
+    return output;
+}
+
+RVec<TypeA_TrueInfo> Manager::TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
+                                                      const RVec<FoundV0_TrueInfo> &v0a_mc, const RVec<FoundV0_TrueInfo> &v0b_mc) {
+    RVec<TypeA_TrueInfo> output;
+    output.reserve(found.size());
+    TypeA_TrueInfo this_sexa_mc{};
+    /* auxiliar vars */
+    Bool_t same_reaction_id;
+    for (const auto &found_sexa : found) {
+        /* defaults */
+        this_sexa_mc.reaction_id = 0;
+        this_sexa_mc.is_signal = false;
+        /* fill values */
+        this_sexa_mc.v0a_mc = v0a_mc[found_sexa.v0a.idx];
+        this_sexa_mc.v0b_mc = v0b_mc[found_sexa.v0b.idx];
+        same_reaction_id = this_sexa_mc.v0a_mc.reaction_id == this_sexa_mc.v0b_mc.reaction_id;
+        if (same_reaction_id) {
+            this_sexa_mc.reaction_id = this_sexa_mc.v0a_mc.reaction_id;
+            this_sexa_mc.is_signal = this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal;
+        }
+        this_sexa_mc.is_hybrid = (!this_sexa_mc.is_signal && ((this_sexa_mc.v0a_mc.is_signal && !this_sexa_mc.v0b_mc.is_signal) ||
+                                                              (!this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal))) ||
+                                 this_sexa_mc.v0a_mc.is_hybrid || this_sexa_mc.v0b_mc.is_hybrid;
+        output.emplace_back(this_sexa_mc);
+    }
+    return output;
+}
+
+Bool_t Manager::TypeA_PassesCuts(const TypeA &sexa, const XYZPoint &v3_pv) {
+    //
+    XYZPoint v3_sexa(sexa.kf.GetX(), sexa.kf.GetY(), sexa.kf.GetZ());
+    /*  */
+    if (v3_sexa.Rho() < Default::ChannelA::MinRadius) return kFALSE;
+    if (TMath::Abs(sexa.lv.Rapidity()) > Default::ChannelA::AbsMaxRapidity) return kFALSE;
+    /*  */ Double_t cpa_wrt_pv = Math::CosinePointingAngle(sexa.lv.Vect(), v3_sexa, v3_pv);
+    if (cpa_wrt_pv < Default::ChannelA::MinCPAwrtPV || cpa_wrt_pv > Default::ChannelA::MaxCPAwrtPV) return kFALSE;
+    /*  */ Double_t dca_la_sv = TMath::Abs((Double_t)sexa.v0a.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_sv > Default::ChannelA::MaxDCALaSV) return kFALSE;
+    /*  */ Double_t dca_la_neg_sv = TMath::Abs((Double_t)sexa.v0a.kf_neg.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_neg_sv > Default::ChannelA::MaxDCALaNegSV) return kFALSE;
+    /*  */ Double_t dca_la_pos_sv = TMath::Abs((Double_t)sexa.v0a.kf_pos.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_pos_sv > Default::ChannelA::MaxDCALaPosSV) return kFALSE;
+    /*  */ Double_t dca_k0s_sv = TMath::Abs((Double_t)sexa.v0b.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_k0s_sv > Default::ChannelA::MaxDCAK0SV) return kFALSE;
+    /*  */ Double_t dca_k0s_neg_sv = TMath::Abs((Double_t)sexa.v0b.kf_neg.GetDistanceFromVertex(sexa.kf));
+    if (dca_k0s_neg_sv > Default::ChannelA::MaxDCAK0NegSV) return kFALSE;
+    /*  */ Double_t dca_k0s_pos_sv = TMath::Abs((Double_t)sexa.v0b.kf_pos.GetDistanceFromVertex(sexa.kf));
+    if (dca_k0s_pos_sv > Default::ChannelA::MaxDCAK0PosSV) return kFALSE;
+    /*  */ Double_t dca_btw_v0s = TMath::Abs((Double_t)sexa.v0a.kf.GetDistanceFromParticle(sexa.v0b.kf));
+    if (dca_btw_v0s > Default::ChannelA::MaxDCAbtwV0s) return kFALSE;
+    return kTRUE;
+}
+
 /*
  * Using Kalman Filter, reconstruct (anti)sexaquark candidates via the reaction channels
  * - `AntiSexaquark Neutron -> AntiLambda K0S`
- * - `??? -> Lambda K0S`
+ * - `X -> Lambda K0S`
  */
 RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
-
-    const Double_t neutron_mass = TDatabasePDG::Instance()->GetParticle(2112)->Mass();
-    const Double_t proton_mass = TDatabasePDG::Instance()->GetParticle(2212)->Mass();
-    const Double_t pion_mass = TDatabasePDG::Instance()->GetParticle(211)->Mass();
-
+    //
     std::string sexaquark_name;
     std::string v0a_name;
-    Double_t v0a_neg_mass, v0a_pos_mass;
     if (!anti_channel) {
-        sexaquark_name = "ASA";      // antisexaquark type a
-        v0a_name = "AL";             // antilambda
-        v0a_neg_mass = proton_mass;  // antiproton
-        v0a_pos_mass = pion_mass;    // piplus
+        sexaquark_name = "ASA";  // antisexaquark type a
+        v0a_name = "AL";         // antilambda
     } else {
-        sexaquark_name = "BA";       // background type a
-        v0a_name = "L";              // lambda
-        v0a_neg_mass = pion_mass;    // piminus
-        v0a_pos_mass = proton_mass;  // proton
+        sexaquark_name = "BA";  // background type a
+        v0a_name = "L";         // lambda
     }
     std::string v0b_name = "K0S";  // kaonzeroshort
 
-    auto KF_SexaquarkFinder = [neutron_mass, v0a_neg_mass, v0a_pos_mass, pion_mass](const RVec<FoundV0> &found_v0a, const RVec<FoundV0> &found_v0b,
-                                                                                    cRVecI charge, const Float_t &magnetic_field,
-                                                                                    const KFVertex &kf_pv) -> RVec<TypeA> {
-        RVec<TypeA> output;
-        TypeA this_sexa;
-        /* protection */
-        if (!found_v0a.size() || !found_v0b.size()) return output;
-        /* one-time definitions */
-        KFParticle::SetField(magnetic_field);
-        XYZPoint v3_pv(kf_pv.GetX(), kf_pv.GetY(), kf_pv.GetZ());
-        PxPyPzMVector lv_struck_neutron(0., 0., 0., neutron_mass);
-        /* useful vars */
-        KFParticle kf_v0a, kf_v0a_neg, kf_v0a_pos;
-        KFParticle kf_v0b, kf_v0b_neg, kf_v0b_pos;
-        PxPyPzMVector lv_v0a, lv_v0a_neg, lv_v0a_pos;
-        PxPyPzMVector lv_v0b, lv_v0b_neg, lv_v0b_pos;
-        PxPyPzMVector lv_sexa;
-        PxPyPzMVector lv_sexa_asdecay;
-        XYZPoint v3_sexa;
-        /* auxiliary vars */
-        Double_t radius, rapidity;
-        Double_t cpa_wrt_pv, dca_la_sv, dca_k0s_sv;
-        Double_t dca_la_neg_sv, dca_la_pos_sv, dca_k0s_neg_sv, dca_k0s_pos_sv;
-        Double_t dca_btw_v0s;
-        for (auto v0a : found_v0a) {
-            for (auto v0b : found_v0b) {
-                /* sanity check */
-                std::set<ULong64_t> unique_track_entries = {v0a.neg, v0a.pos, v0b.neg, v0b.pos};
-                if (unique_track_entries.size() != 4) continue;
-                /* (debug) */
-                // std::cout << "v0a = " << v0a.kf.GetX() << " " << v0a.kf.GetY() << " " << v0a.kf.GetZ() << std::endl;
-                // std::cout << "v0b = " << v0b.kf.GetX() << " " << v0b.kf.GetY() << " " << v0b.kf.GetZ() << std::endl;
-                /* geometry */
-                /* -- copy KFParticle objects... */
-                // kf_v0a = v0a.kf;
-                // kf_v0a_neg = v0a.kf_neg;
-                // kf_v0a_pos = v0a.kf_pos;
-                // kf_v0b = v0b.kf;
-                // kf_v0b_neg = v0b.kf_neg;
-                // kf_v0b_pos = v0b.kf_pos;
-                /* (debug) */
-                // std::cout << "v0a (after copy) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << std::endl;
-                // std::cout << "v0b (after copy) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << std::endl;
-                //
-                KFParticle kf_sexa;
-                kf_sexa.AddDaughter(kf_v0a);
-                kf_sexa.AddDaughter(kf_v0b);
-                kf_sexa.TransportToDecayVertex();
-                if (TMath::IsNaN(kf_sexa.GetX()) || TMath::IsNaN(kf_sexa.GetY()) || TMath::IsNaN(kf_sexa.GetZ())) continue;
-                v3_sexa.SetCoordinates(kf_sexa.GetX(), kf_sexa.GetY(), kf_sexa.GetZ());
-                /* (debug) */
-                std::cout << "v0a (after added) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << '\n';
-                std::cout << "v0b (after added) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << '\n';
-                std::cout << "sexa = " << kf_sexa.GetX() << " " << kf_sexa.GetY() << " " << kf_sexa.GetZ() << '\n';
-                /* transport V0s */
-                kf_v0a.SetProductionVertex(kf_sexa);
-                kf_v0b.SetProductionVertex(kf_sexa);
-                kf_v0a.TransportToProductionVertex();
-                kf_v0b.TransportToProductionVertex();
-                /* (debug) */
-                // std::cout << "v0a (after supposed transport) = " << kf_v0a.GetX() << " " << kf_v0a.GetY() << " " << kf_v0a.GetZ() << std::endl;
-                // std::cout << "v0b (after supposed transport) = " << kf_v0b.GetX() << " " << kf_v0b.GetY() << " " << kf_v0b.GetZ() << std::endl;
-                /* transport V0s daughters */
-                // kf_v0a_neg = Math::TransportKFParticle(magnetic_field, kf_v0a_neg, kf_v0a_pos, v0a_neg_mass, charge[v0a.neg]);
-                // kf_v0a_pos = Math::TransportKFParticle(magnetic_field, kf_v0a_pos, kf_v0a_neg, v0a_pos_mass, charge[v0a.pos]);
-                // kf_v0b_neg = Math::TransportKFParticle(magnetic_field, kf_v0b_neg, kf_v0b_pos, pion_mass, charge[v0b.neg]);
-                // kf_v0b_pos = Math::TransportKFParticle(magnetic_field, kf_v0b_pos, kf_v0b_neg, pion_mass, charge[v0b.pos]);
-                /* kinematics */
-                lv_v0a_neg.SetCoordinates(kf_v0a_neg.Px(), kf_v0a_neg.Py(), kf_v0a_neg.Pz(), v0a_neg_mass);
-                lv_v0a_pos.SetCoordinates(kf_v0a_pos.Px(), kf_v0a_pos.Py(), kf_v0a_pos.Pz(), v0a_pos_mass);
-                lv_v0b_neg.SetCoordinates(kf_v0b_neg.Px(), kf_v0b_neg.Py(), kf_v0b_neg.Pz(), pion_mass);
-                lv_v0b_pos.SetCoordinates(kf_v0b_pos.Px(), kf_v0b_pos.Py(), kf_v0b_pos.Pz(), pion_mass);
-                lv_v0a = lv_v0a_neg + lv_v0a_pos;
-                lv_v0b = lv_v0b_neg + lv_v0b_pos;
-                lv_sexa = lv_v0a + lv_v0b - lv_struck_neutron;
-                lv_sexa_asdecay = lv_v0a + lv_v0b;
-                /* calculate properties */
-                radius = v3_sexa.Rho();
-                rapidity = lv_sexa.Rapidity();
-                cpa_wrt_pv = Math::CosinePointingAngle(lv_sexa.Vect(), v3_sexa, v3_pv);
-                dca_la_sv = TMath::Abs(kf_v0a.GetDistanceFromVertex(kf_sexa));
-                dca_la_neg_sv = TMath::Abs(kf_v0a_neg.GetDistanceFromVertex(kf_sexa));
-                dca_la_pos_sv = TMath::Abs(kf_v0a_pos.GetDistanceFromVertex(kf_sexa));
-                dca_k0s_sv = TMath::Abs(kf_v0b.GetDistanceFromVertex(kf_sexa));
-                dca_k0s_neg_sv = TMath::Abs(kf_v0b_neg.GetDistanceFromVertex(kf_sexa));
-                dca_k0s_pos_sv = TMath::Abs(kf_v0b_pos.GetDistanceFromVertex(kf_sexa));
-                dca_btw_v0s = TMath::Abs(kf_v0a.GetDistanceFromParticle(kf_v0b));
-                /* (debug) */
-                std::cout << "radius=" << radius << " rapidity=" << rapidity << " cpa_wrt_pv=" << cpa_wrt_pv << " dca_la_sv=" << dca_la_sv
-                          << " dca_la_neg_sv=" << dca_la_neg_sv << " dca_la_pos_sv=" << dca_la_pos_sv << " dca_k0s_sv=" << dca_k0s_sv
-                          << " dca_k0s_neg_sv=" << dca_k0s_neg_sv << " dca_k0s_pos_sv=" << dca_k0s_pos_sv << " dca_btw_v0s=" << dca_btw_v0s << '\n';
-                /* cuts */
-                if (radius < Default::ChannelA::MinRadius || radius > 200.) continue;
-                if (TMath::Abs(rapidity) > Default::ChannelA::AbsMaxRapidity) continue;
-                if (cpa_wrt_pv < Default::ChannelA::MinCPAwrtPV || cpa_wrt_pv > Default::ChannelA::MaxCPAwrtPV) continue;
-                if (dca_la_sv > Default::ChannelA::MaxDCALaSV) continue;
-                if (dca_la_neg_sv > Default::ChannelA::MaxDCALaNegSV) continue;
-                if (dca_la_pos_sv > Default::ChannelA::MaxDCALaPosSV) continue;
-                if (dca_k0s_sv > Default::ChannelA::MaxDCAK0SV) continue;
-                if (dca_k0s_neg_sv > Default::ChannelA::MaxDCAK0NegSV) continue;
-                if (dca_k0s_pos_sv > Default::ChannelA::MaxDCAK0PosSV) continue;
-                if (dca_btw_v0s > Default::ChannelA::MaxDCAbtwV0s) continue;
-                std::cout << "a candidate passed all cuts!" << '\n';
-                /* store */
-                this_sexa.v0a = v0a;
-                this_sexa.v0b = v0b;
-                this_sexa.kf = kf_sexa;
-                this_sexa.lv = lv_sexa;
-                this_sexa.lv_asdecay = lv_sexa_asdecay;
-                output.push_back(this_sexa);
-            }  // end of loop over k0s
-        }      // end of loop over (anti)lambdas
-        return output;
-    };
-    //
-    auto CollectTrueInfo = [](const RVec<TypeA> &found, const RVec<FoundV0_TrueInfo> &v0a_mc,
-                              const RVec<FoundV0_TrueInfo> &v0b_mc) -> RVec<TypeA_TrueInfo> {
-        RVec<TypeA_TrueInfo> output;
-        output.reserve(found.size());
-        TypeA_TrueInfo this_sexa_mc{};
-        /* auxiliar vars */
-        Bool_t same_reaction_id;
-        for (const auto &found_sexa : found) {
-            /* defaults */
-            this_sexa_mc.reaction_id = 0;
-            this_sexa_mc.is_signal = false;
-            /* fill values */
-            this_sexa_mc.v0a_mc = v0a_mc[found_sexa.v0a.idx];
-            this_sexa_mc.v0b_mc = v0b_mc[found_sexa.v0b.idx];
-            same_reaction_id = this_sexa_mc.v0a_mc.reaction_id == this_sexa_mc.v0b_mc.reaction_id;
-            if (same_reaction_id) {
-                this_sexa_mc.reaction_id = this_sexa_mc.v0a_mc.reaction_id;
-                this_sexa_mc.is_signal = this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal;
-            }
-            this_sexa_mc.is_hybrid = (!this_sexa_mc.is_signal && ((this_sexa_mc.v0a_mc.is_signal && !this_sexa_mc.v0b_mc.is_signal) ||
-                                                                  (!this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal))) ||
-                                     this_sexa_mc.v0a_mc.is_hybrid || this_sexa_mc.v0b_mc.is_hybrid;
-            output.emplace_back(this_sexa_mc);
-        }
-        return output;
-    };
-
-    RNode df_Sexaquarks = df.Define("Found_" + sexaquark_name, KF_SexaquarkFinder,  //
-                                    {"Found_" + v0a_name, "Found_" + v0b_name, "Track_Charge", "MagneticField", "Event_KF_PV"})
+    RNode df_Sexaquarks = df.Define("Found_" + sexaquark_name, TypeA_KF_Finder,  //
+                                    {"Found_" + v0a_name, "Found_" + v0b_name, "MagneticField", "Event_KF_PV"})
                               .Define(sexaquark_name + "_Mass",
                                       [](const RVec<TypeA> &sexaquarks) { return Map(sexaquarks, [](const TypeA &sexa) { return sexa.lv.M(); }); },
                                       {"Found_" + sexaquark_name})
@@ -743,8 +725,8 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
 
     if (Settings::IsMC) {
         df_Sexaquarks =
-            df_Sexaquarks                                               //
-                .Define(sexaquark_name + "_TrueInfo", CollectTrueInfo,  //
+            df_Sexaquarks
+                .Define(sexaquark_name + "_TrueInfo", TypeA_TrueInfoCollector,
                         {"Found_" + sexaquark_name, v0a_name + "_TrueInfo", v0b_name + "_TrueInfo"})
                 .Define(sexaquark_name + "_V0a_Neg_McEntry",
                         [](const RVec<TypeA_TrueInfo> &sexaquarks) {
@@ -802,37 +784,6 @@ RNode Manager::FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel) {
 RNode Manager::FindSexaquarks_TypeH(RNode df, Bool_t anti_channel) {
     //
     return df;
-}
-
-void Manager::CollectTrueInfo_ChannelA() {
-    //
-    // mcIdxNeg_GenLambda = getMcIdx_fromEsdIdx[esdIdxNeg_GenLambda];
-    // mcIdxPos_GenLambda = getMcIdx_fromEsdIdx[esdIdxPos_GenLambda];
-    // mcIdxNeg_KaonZeroShort = getMcIdx_fromEsdIdx[esdIdxNeg_KaonZeroShort];
-    // mcIdxPos_KaonZeroShort = getMcIdx_fromEsdIdx[esdIdxPos_KaonZeroShort];
-    // is_signal = isMcIdxSignal[mcIdxNeg_GenLambda] && isMcIdxSignal[mcIdxPos_GenLambda] && isMcIdxSignal[mcIdxNeg_KaonZeroShort] &&
-    // isMcIdxSignal[mcIdxPos_KaonZeroShort] &&  //
-    // getPdgCode_fromMcIdx[mcIdxNeg_GenLambda] == getNegPdgCode_fromV0PdgCode[pdgCodeV0] &&
-    // getPdgCode_fromMcIdx[mcIdxPos_GenLambda] == getPosPdgCode_fromV0PdgCode[pdgCodeV0] &&
-    // getPdgCode_fromMcIdx[mcIdxNeg_KaonZeroShort] == getNegPdgCode_fromV0PdgCode[pdgCodeKaon] &&
-    // getPdgCode_fromMcIdx[mcIdxPos_KaonZeroShort] == getPosPdgCode_fromV0PdgCode[pdgCodeKaon] &&  //
-    // getReactionID_fromMcIdx[mcIdxNeg_GenLambda] == getReactionID_fromMcIdx[mcIdxPos_GenLambda] &&
-    // getReactionID_fromMcIdx[mcIdxPos_GenLambda] == getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
-    // getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] == getReactionID_fromMcIdx[mcIdxPos_KaonZeroShort];
-    // reaction_id = getReactionID_fromMcIdx[mcIdxNeg_GenLambda] == getReactionID_fromMcIdx[mcIdxPos_GenLambda] &&
-    //   getReactionID_fromMcIdx[mcIdxPos_GenLambda] == getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
-    //   getReactionID_fromMcIdx[mcIdxNeg_KaonZeroShort] == getReactionID_fromMcIdx[mcIdxPos_KaonZeroShort]
-    //   ? getReactionID_fromMcIdx[mcIdxNeg_GenLambda]
-    //   : -1;
-    // is_hybrid = (isMcIdxSignal[mcIdxNeg_GenLambda] || isMcIdxSignal[mcIdxPos_GenLambda] || isMcIdxSignal[mcIdxNeg_KaonZeroShort] ||
-    //  isMcIdxSignal[mcIdxPos_KaonZeroShort]) &&
-    // !is_signal;
-    // same_ancestor = getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] != -1 &&
-    // getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] == getAncestorMcIdx_fromMcIdx[mcIdxPos_GenLambda] &&
-    // getAncestorMcIdx_fromMcIdx[mcIdxPos_GenLambda] == getAncestorMcIdx_fromMcIdx[mcIdxNeg_KaonZeroShort] &&
-    // getAncestorMcIdx_fromMcIdx[mcIdxNeg_KaonZeroShort] == getAncestorMcIdx_fromMcIdx[mcIdxPos_KaonZeroShort];
-    // is_noncomb_bkg = !is_signal && !is_hybrid && same_ancestor;
-    // ancestor_idx = is_noncomb_bkg ? getAncestorMcIdx_fromMcIdx[mcIdxNeg_GenLambda] : -1;
 }
 
 /*           */

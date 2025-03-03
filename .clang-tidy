@@ -15,8 +15,14 @@ Checks: "*,
   -misc-non-private-member-variables-in-classes,
   -readability-identifier-length,
   -readability-braces-around-statements,
+  -readability-isolate-declaration,
+  -readability-math-missing-parentheses,
+  -readability-implicit-bool-conversion,
   -bugprone-easily-swappable-parameters,
-  -hicpp-braces-around-statements,"
+  -hicpp-braces-around-statements,
+  -hicpp-special-member-functions,
+  -cppcoreguidelines-special-member-functions,
+  -cppcoreguidelines-init-variables,"
 WarningsAsErrors: ""
 HeaderFilterRegex: ""
 FormatStyle: none

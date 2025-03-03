@@ -33,6 +33,7 @@ using XYZPoint = ROOT::Math::XYZPoint;
 #define HomogeneousField  // homogeneous field in z direction, required by KFParticle
 #endif
 #include "KFParticle.h"
+#include "KFVertex.h"
 
 namespace Tree2Sexaquark {
 
@@ -52,17 +53,22 @@ const Int_t KaonZeroShort = 310;
 
 namespace Analysis {
 
+struct KF_Track {
+    ULong64_t entry;
+    KFParticle kf;
+};
+
+struct FoundV0 {
+    ULong64_t idx, neg, pos;
+    KFParticle kf, kf_neg, kf_pos;
+    PxPyPzMVector lv, lv_neg, lv_pos;
+};
+
 struct FoundV0_TrueInfo {
     ULong64_t neg, pos, entry;
     Bool_t same_mother, is_true, is_signal, is_secondary, is_hybrid;
     Int_t neg_pdg_code, pos_pdg_code, pdg_code;
     UInt_t reaction_id;
-};
-
-struct FoundV0 {
-    ULong64_t idx, neg, pos;
-    XYZPoint v3;
-    PxPyPzMVector lv, lv_neg, lv_pos;
 };
 
 struct TypeA_TrueInfo {
@@ -74,6 +80,20 @@ struct TypeA_TrueInfo {
 };
 
 struct TypeA {
+    FoundV0 v0a, v0b;
+    KFParticle kf;
+    PxPyPzMVector lv, lv_asdecay;
+};
+
+struct TypeD_TrueInfo {
+    FoundV0_TrueInfo v0a_mc, v0b_mc;
+    Bool_t is_signal, is_hybrid;
+    UInt_t reaction_id;
+    // ULong64_t ancestor; // PENDING
+    // Bool_t same_ancestor, is_noncomb_bkg; // PENDING
+};
+
+struct TypeD {
     FoundV0 v0a, v0b;
     KFParticle kf;
     PxPyPzMVector lv, lv_asdecay;
@@ -97,6 +117,17 @@ class Manager {
     static RNode ProcessTracks(RNode df);
 
     /* V0s */
+    static RVec<FoundV0> V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,                //
+                                       cRVecUL entries_neg_, cRVecUL entries_pos_,                             //
+                                       cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
+                                       cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
+                                       const RVec<RVecF> &cov_matrix,                                          //
+                                       const Float_t &magnetic_field, const XYZPoint &v3_pv);
+    static RVec<FoundV0_TrueInfo> V0s_TrueInfoCollector(Int_t pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
+                                                        const RVec<FoundV0> &found_v0s,                                   //
+                                                        cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,                 //
+                                                        cRVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal, cRVecU mc_reaction_id);
+    static Bool_t V0s_PassesCuts(Int_t pdg_code_v0, const FoundV0 &v0, const XYZPoint &v3_pv);
     RNode FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pdg_code_pos);
 
     /* Sexaquarks */
@@ -109,8 +140,16 @@ class Manager {
         }
         return FindSexaquarks_TypeH(data_frame, pdg_struck_nucleon < 0);
     }
-
-    void CollectTrueInfo_ChannelA();
+    /* -- Type A */
+    static RVec<TypeA> TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<FoundV0> &found_v0b,  //
+                                       const Float_t &magnetic_field, const KFVertex &kf_pv);
+    static RVec<TypeA_TrueInfo> TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
+                                                        const RVec<FoundV0_TrueInfo> &v0a_mc, const RVec<FoundV0_TrueInfo> &v0b_mc);
+    static Bool_t TypeA_PassesCuts(const TypeA &sexa, const XYZPoint &v3_pv);
+    /* -- Type D */
+    static RVec<TypeD> TypeD_KF_Finder();
+    static RVec<TypeD_TrueInfo> TypeD_TrueInfoCollector();
+    static Bool_t TypeD_PassesCuts();
 
     /* Cuts */
 
@@ -128,14 +167,14 @@ class Manager {
     static RVec<T> ExtractVector_Sum(const RVec<T> &property, const RVec<RVecUL> &entries_);
 
     /* Utilities */
-    void PrintAll(RNode df);
+    static void PrintAll(RNode df);
     void EndOfAnalysis(RNode df);
 
    private:
     /* Functions */
-    RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
-    RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
-    RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
+    static RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
+    static RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
+    static RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
 
     std::vector<std::string> fAnalyzed_V0sNames;
 };

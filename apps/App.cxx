@@ -1,14 +1,12 @@
 #include "Analysis/Manager.hxx"
 #include "Analysis/Settings.hxx"
 #include "Utilities/Parser.hxx"
-#include <TROOT.h>
 
 using namespace Tree2Sexaquark;
 
 int main(int argc, char *argv[]) {
 
     Logger *LoggerInstance = Logger::GetInstance();
-    Analysis::Settings *SettingsInstance = Analysis::Settings::GetInstance();
 
     std::unique_ptr<Parser> ParserInstance =
         std::make_unique<Parser>("Tree2Sexaquark -- Read AnalysisResults.root and create Sexaquark Analysis Results!");
@@ -23,7 +21,7 @@ int main(int argc, char *argv[]) {
     RDataFrame DF_Input("Events", Analysis::Settings::PathInputFile);
     /* Start */
     RNode DF_Main = DF_Input;
-    if (Analysis::Settings::LimitToNEvents) DF_Main = DF_Input.Range(Analysis::Settings::LimitToNEvents);
+    if (Analysis::Settings::LimitToNEvents > 0) DF_Main = DF_Input.Range(Analysis::Settings::LimitToNEvents);
     /* Events */
     DF_Main = ThisAnalysis->ProcessEvent(DF_Main);
     /* MC */
@@ -35,10 +33,10 @@ int main(int argc, char *argv[]) {
     DF_Main = ThisAnalysis->ProcessTracks(DF_Main);
     /* V0s */
     // DF_Main = ThisAnalysis->FindV0s(DF_Main, 3122, -211, 2212);
-    DF_Main = ThisAnalysis->FindV0s(DF_Main, -3122, -2212, 211);
-    DF_Main = ThisAnalysis->FindV0s(DF_Main, 310, -211, 211);
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, PdgCode::AntiLambda, PdgCode::AntiProton, PdgCode::PiPlus);
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, PdgCode::KaonZeroShort, PdgCode::PiMinus, PdgCode::PiPlus);
     /* Sexaquarks */
-    DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
     // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, -2112, 3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
     /*
     ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
@@ -49,7 +47,6 @@ int main(int argc, char *argv[]) {
     // ThisAnalysis->PrintAll(DF_Main);       // DEBUG
     ThisAnalysis->EndOfAnalysis(DF_Main);
 
-    Analysis::Settings::DeleteInstance();
     Logger::DeleteInstance();
 
     return 0;
