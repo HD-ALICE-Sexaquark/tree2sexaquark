@@ -27,6 +27,7 @@ using RVecF = ROOT::RVecF;
 using cRVecF = const ROOT::RVecF &;
 
 using PxPyPzMVector = ROOT::Math::PxPyPzMVector;
+using PxPyPzEVector = ROOT::Math::PxPyPzEVector;
 using XYZPoint = ROOT::Math::XYZPoint;
 
 #ifndef HomogeneousField
@@ -56,12 +57,14 @@ namespace Analysis {
 struct KF_Track {
     ULong64_t entry;
     KFParticle kf;
+    PxPyPzMVector lv;
 };
 
 struct FoundV0 {
-    ULong64_t idx, neg, pos;
-    KFParticle kf, kf_neg, kf_pos;
-    PxPyPzMVector lv, lv_neg, lv_pos;
+    KF_Track neg, pos;
+    ULong64_t idx;
+    KFParticle kf;
+    PxPyPzMVector lv;
 };
 
 struct FoundV0_TrueInfo {
@@ -114,14 +117,15 @@ class Manager {
     static RNode ProcessMCParticles(RNode df);
 
     /* Tracks */
+    static RVec<KF_Track> Tracks_KF_Creator(Double_t pdg_mass, cRVecUL entries_,                                    //
+                                            cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
+                                            cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
+                                            const RVec<RVecF> &cov_matrix, const Float_t &magnetic_field);
     static RNode ProcessTracks(RNode df);
 
     /* V0s */
-    static RVec<FoundV0> V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,                //
-                                       cRVecUL entries_neg_, cRVecUL entries_pos_,                             //
-                                       cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
-                                       cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
-                                       const RVec<RVecF> &cov_matrix,                                          //
+    static RVec<FoundV0> V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,             //
+                                       const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
                                        const Float_t &magnetic_field, const XYZPoint &v3_pv);
     static RVec<FoundV0_TrueInfo> V0s_TrueInfoCollector(Int_t pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
                                                         const RVec<FoundV0> &found_v0s,                                   //
@@ -145,7 +149,7 @@ class Manager {
                                        const Float_t &magnetic_field, const KFVertex &kf_pv);
     static RVec<TypeA_TrueInfo> TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
                                                         const RVec<FoundV0_TrueInfo> &v0a_mc, const RVec<FoundV0_TrueInfo> &v0b_mc);
-    static Bool_t TypeA_PassesCuts(const TypeA &sexa, const XYZPoint &v3_pv);
+    static Bool_t TypeA_PassesCuts(const TypeA &sexa, const KFVertex &kf_pv);
     /* -- Type D */
     static RVec<TypeD> TypeD_KF_Finder();
     static RVec<TypeD_TrueInfo> TypeD_TrueInfoCollector();
@@ -172,11 +176,12 @@ class Manager {
 
    private:
     /* Functions */
-    static RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
-    static RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
-    static RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
 
     std::vector<std::string> fAnalyzed_V0sNames;
+    std::vector<std::string> fAnalyzed_Channels;
 };
 
 }  // namespace Analysis

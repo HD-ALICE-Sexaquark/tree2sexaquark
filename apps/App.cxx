@@ -32,12 +32,13 @@ int main(int argc, char *argv[]) {
     /* Tracks */
     DF_Main = ThisAnalysis->ProcessTracks(DF_Main);
     /* V0s */
-    // DF_Main = ThisAnalysis->FindV0s(DF_Main, 3122, -211, 2212);
     DF_Main = ThisAnalysis->FindV0s(DF_Main, PdgCode::AntiLambda, PdgCode::AntiProton, PdgCode::PiPlus);
+    DF_Main = ThisAnalysis->FindV0s(DF_Main, PdgCode::Lambda, PdgCode::PiPlus, PdgCode::Proton);
     DF_Main = ThisAnalysis->FindV0s(DF_Main, PdgCode::KaonZeroShort, PdgCode::PiMinus, PdgCode::PiPlus);
     /* Sexaquarks */
-    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, 2112, {-3122, 310});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
-    // DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, -2112, 3122, 310});  // `Sexaquark,AntiNeutron -> Lambda,K0S`
+    DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, PdgCode::Neutron,
+                                           {PdgCode::AntiLambda, PdgCode::KaonZeroShort});  // `AntiSexaquark,Neutron -> AntiLambda,K0S`
+    DF_Main = ThisAnalysis->FindSexaquarks(DF_Main, PdgCode::AntiNeutron, {PdgCode::Lambda, PdgCode::KaonZeroShort});  // `X -> Lambda,K0S`
     /*
     ThisAnalysis->KalmanSexaquarkFinder(2212, {-3122, 321, -211, 211});   // `AntiSexaquark,Proton -> AntiLambda,K+,(pi-,pi+)`
     ThisAnalysis->KalmanSexaquarkFinder(-2212, {3122, -321, -211, 211});  // `Sexaquark,AntiProton -> Lambda,K-,(pi-,pi+)`
