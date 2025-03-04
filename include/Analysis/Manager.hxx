@@ -38,19 +38,20 @@ using XYZPoint = ROOT::Math::XYZPoint;
 
 namespace Tree2Sexaquark {
 
-namespace PdgCode {
-const Int_t PiMinus = -211;
-const Int_t PiPlus = 211;
-const Int_t NegKaon = -321;
-const Int_t PosKaon = 321;
-const Int_t AntiProton = -2212;
-const Int_t Proton = 2212;
-const Int_t AntiNeutron = -2112;
-const Int_t Neutron = 2112;
-const Int_t AntiLambda = -3122;
-const Int_t Lambda = 3122;
-const Int_t KaonZeroShort = 310;
-}  // namespace PdgCode
+enum PdgCode : Int_t {
+    PiMinus = -211,
+    PiPlus = 211,
+    NegKaon = -321,
+    PosKaon = 321,
+    AntiProton = -2212,
+    Proton = 2212,
+    AntiNeutron = -2112,
+    Neutron = 2112,
+    AntiLambda = -3122,
+    Lambda = 3122,
+    KaonZeroShort = 310,
+    None = 0
+};
 
 namespace Analysis {
 
@@ -60,36 +61,36 @@ struct KF_Track {
     PxPyPzMVector lv;
 };
 
-struct FoundV0 {
+struct MC_Track {
+    ULong64_t entry, mother_entry;
+    UInt_t reaction_id;
+    Int_t pdg_code;
+    Bool_t is_secondary, is_signal;
+};
+
+struct KF_V0 {
     KF_Track neg, pos;
     ULong64_t idx;
     KFParticle kf;
     PxPyPzMVector lv;
 };
 
-struct FoundV0_TrueInfo {
-    ULong64_t neg, pos, entry;
-    Bool_t same_mother, is_true, is_signal, is_secondary, is_hybrid;
-    Int_t neg_pdg_code, pos_pdg_code, pdg_code;
+struct MC_V0 {
+    MC_Track neg, pos;
+    Long64_t mc_entry;
+    Int_t pdg_code;
     UInt_t reaction_id;
-};
-
-struct TypeA_TrueInfo {
-    FoundV0_TrueInfo v0a_mc, v0b_mc;
-    Bool_t is_signal, is_hybrid;
-    UInt_t reaction_id;
-    // ULong64_t ancestor; // PENDING
-    // Bool_t same_ancestor, is_noncomb_bkg; // PENDING
+    Bool_t has_mc, is_true, is_signal, is_hybrid;
 };
 
 struct TypeA {
-    FoundV0 v0a, v0b;
+    KF_V0 v0a, v0b;
     KFParticle kf;
     PxPyPzMVector lv, lv_asdecay;
 };
 
-struct TypeD_TrueInfo {
-    FoundV0_TrueInfo v0a_mc, v0b_mc;
+struct MC_TypeA {
+    MC_V0 mc_v0a, mc_v0b;
     Bool_t is_signal, is_hybrid;
     UInt_t reaction_id;
     // ULong64_t ancestor; // PENDING
@@ -97,9 +98,19 @@ struct TypeD_TrueInfo {
 };
 
 struct TypeD {
-    FoundV0 v0a, v0b;
+    KF_V0 v0;
+    KF_Track ba;
     KFParticle kf;
     PxPyPzMVector lv, lv_asdecay;
+};
+
+struct MC_TypeD {
+    MC_V0 mc_v0;
+    MC_Track mc_ba;
+    Bool_t is_signal, is_hybrid;
+    UInt_t reaction_id;
+    // ULong64_t ancestor; // PENDING
+    // Bool_t same_ancestor, is_noncomb_bkg; // PENDING
 };
 
 class Manager {
@@ -107,7 +118,7 @@ class Manager {
     Manager() = default;
     ~Manager() = default;
 
-    static void Init();
+    void Init();
     static RNode ProcessEvent(RNode df);
 
     /* Injected AntiSexaquark-Nucleon Interactions */
@@ -121,39 +132,40 @@ class Manager {
                                             cRVecF px, cRVecF py, cRVecF pz, cRVecF x, cRVecF y, cRVecF z,          //
                                             cRVecI charge, cRVecF alpha, cRVecF snp, cRVecF tgl, cRVecF signed1pt,  //
                                             const RVec<RVecF> &cov_matrix, const Float_t &magnetic_field);
+    static RVec<MC_Track> Linked_MC_Creator(cRVecUL linked_mc_entries_, cRVecL mother_mc_entries_,  //
+                                            cRVecI pdg_code, cRVecI is_secondary, cRVecI is_signal, cRVecU reaction_id);
     static RNode ProcessTracks(RNode df);
 
     /* V0s */
-    static RVec<FoundV0> V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,             //
-                                       const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
-                                       const Float_t &magnetic_field, const XYZPoint &v3_pv);
-    static RVec<FoundV0_TrueInfo> V0s_TrueInfoCollector(Int_t pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
-                                                        const RVec<FoundV0> &found_v0s,                                   //
-                                                        cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,                 //
-                                                        cRVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal, cRVecU mc_reaction_id);
-    static Bool_t V0s_PassesCuts(Int_t pdg_code_v0, const FoundV0 &v0, const XYZPoint &v3_pv);
-    RNode FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pdg_code_pos);
+    static RVec<KF_V0> V0s_KF_Finder(PdgCode pdg_code_v0, Double_t neg_mass, Double_t pos_mass,           //
+                                     const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
+                                     const Float_t &magnetic_field, const XYZPoint &v3_pv);
+    static RVec<MC_V0> V0s_TrueInfoCollector(PdgCode pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
+                                             const RVec<KF_V0> &found_v0s, const RVec<MC_Track> &linked_mc,      //
+                                             cRVecI pdg_code, cRVecI is_signal, cRVecU reaction_id);
+    static Bool_t V0s_PassesCuts(PdgCode pdg_code_v0, const KF_V0 &v0, const XYZPoint &v3_pv);
+    RNode FindV0s(RNode df, PdgCode pdg_code_v0, PdgCode pdg_code_neg, PdgCode pdg_code_pos);
 
     /* Sexaquarks */
-    RNode FindSexaquarks(const RNode &data_frame, Int_t pdg_struck_nucleon, const std::vector<Int_t> &pdg_reaction_products) {
-        if (TMath::Abs(pdg_struck_nucleon) == PdgCode::Neutron) {
-            return FindSexaquarks_TypeA(data_frame, pdg_struck_nucleon < 0);
+    RNode FindSexaquarks(const RNode &data_frame, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products) {
+        if (TMath::Abs(struck_nucleon) == PdgCode::Neutron) {
+            return FindSexaquarks_TypeA(data_frame, struck_nucleon, reaction_products);
+        } else {  // if (TMath::Abs(struck_nucleon) == PdgCode::Proton)
+            return FindSexaquarks_TypeD(data_frame, struck_nucleon, reaction_products);
         }
-        if (pdg_reaction_products.size() > 2) {
-            return FindSexaquarks_TypeDE(data_frame, pdg_struck_nucleon < 0);
-        }
-        return FindSexaquarks_TypeH(data_frame, pdg_struck_nucleon < 0);
     }
     /* -- Type A */
-    static RVec<TypeA> TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<FoundV0> &found_v0b,  //
+    static RVec<TypeA> TypeA_KF_Finder(const RVec<KF_V0> &found_v0a, const RVec<KF_V0> &found_v0b,  //
                                        const Float_t &magnetic_field, const KFVertex &kf_pv);
-    static RVec<TypeA_TrueInfo> TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
-                                                        const RVec<FoundV0_TrueInfo> &v0a_mc, const RVec<FoundV0_TrueInfo> &v0b_mc);
+    static RVec<MC_TypeA> TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
+                                                  const RVec<MC_V0> &mc_v0a, const RVec<MC_V0> &mc_v0b);
     static Bool_t TypeA_PassesCuts(const TypeA &sexa, const KFVertex &kf_pv);
     /* -- Type D */
-    static RVec<TypeD> TypeD_KF_Finder();
-    static RVec<TypeD_TrueInfo> TypeD_TrueInfoCollector();
-    static Bool_t TypeD_PassesCuts();
+    static RVec<TypeD> TypeD_KF_Finder(const RVec<KF_V0> &found_v0s, const RVec<KF_Track> &bach_tracks,  //
+                                       const Float_t &magnetic_field, const KFVertex &kf_pv);
+    static RVec<MC_TypeD> TypeD_TrueInfoCollector(const RVec<TypeD> &found,  //
+                                                  const RVec<MC_V0> &mc_v0, const RVec<MC_Track> &mc_ba);
+    static Bool_t TypeD_PassesCuts(const TypeD &sexa, const KFVertex &kf_pv);
 
     /* Cuts */
 
@@ -175,13 +187,13 @@ class Manager {
     void EndOfAnalysis(RNode df);
 
    private:
-    /* Functions */
-    RNode FindSexaquarks_TypeA(RNode df, Bool_t anti_channel);
-    RNode FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel);
-    RNode FindSexaquarks_TypeH(RNode df, Bool_t anti_channel);
+    RNode FindSexaquarks_TypeA(RNode df, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products);
+    RNode FindSexaquarks_TypeD(RNode df, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products);
 
+    /* Containers */
     std::vector<std::string> fAnalyzed_V0sNames;
     std::vector<std::string> fAnalyzed_Channels;
+    std::map<PdgCode, std::string> fParticleName_;  // key: pdg_code
 };
 
 }  // namespace Analysis

@@ -77,7 +77,7 @@ const Double_t MaxDCAbtwV0s = 10.;
 
 namespace ChannelD {
 const Double_t MinRadius = 30.;
-const Double_t MaxRapidity = 0.8;
+const Double_t AbsMaxRapidity = 0.8;
 const Double_t MinCPAwrtPV = 0.99;
 const Double_t MaxCPAwrtPV = 1.;
 const Double_t MaxDCALaSV = 2.;
@@ -85,7 +85,6 @@ const Double_t MaxDCALaNegSV = 10.;
 const Double_t MaxDCALaPosSV = 10.;
 const Double_t MaxDCAKaSV = 0.2;
 const Double_t MaxDCAKaLa = 0.3;
-// Max_SexaquarkD_DCAv0SV = 0.2; // PENDING
 }  // namespace ChannelD
 
 namespace ChannelE {

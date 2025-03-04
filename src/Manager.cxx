@@ -3,12 +3,15 @@
 #include <cstddef>
 #include <set>
 
+#include "RtypesCore.h"
 #include "TDatabasePDG.h"
 
 #include "Analysis/Settings.hxx"
 #include "Cuts/Default.hxx"
 #include "Math/Common.hxx"
 #include "Math/KalmanFilter.hxx"
+
+#define READ_ESD_INDICES 0
 
 namespace Tree2Sexaquark::Analysis {
 
@@ -60,6 +63,18 @@ void Manager::Init() {
         ROOT::EnableThreadSafety();
         ROOT::EnableImplicitMT(Settings::NThreads);
     }
+    /* init map */
+    fParticleName_[PdgCode::PiMinus] = "PiMinus";
+    fParticleName_[PdgCode::PiPlus] = "PiPlus";
+    fParticleName_[PdgCode::NegKaon] = "NegKaon";
+    fParticleName_[PdgCode::PosKaon] = "PosKaon";
+    fParticleName_[PdgCode::AntiProton] = "AntiProton";
+    fParticleName_[PdgCode::Proton] = "Proton";
+    fParticleName_[PdgCode::AntiNeutron] = "AntiNeutron";
+    fParticleName_[PdgCode::Neutron] = "Neutron";
+    fParticleName_[PdgCode::AntiLambda] = "AL";
+    fParticleName_[PdgCode::Lambda] = "L";
+    fParticleName_[PdgCode::KaonZeroShort] = "K0S";
 }
 
 RNode Manager::ProcessEvent(RNode df) {
@@ -76,6 +91,10 @@ RNode Manager::ProcessEvent(RNode df) {
 
     return DF_Events;
 }
+
+/*                  */
+/**  MC Particles  **/
+/*** ============ ***/
 
 RNode Manager::ProcessMCParticles(RNode df) {
     //
@@ -131,7 +150,7 @@ RNode Manager::ProcessMCParticles(RNode df) {
     RNode df_MC =
         df.Alias("MC_Mother_McEntry_", "MC_Mother_McEntry")
             .Alias("Track_McEntry_", "Track_McEntry")
-            /* # Trivial Definitions */
+            /* # Trivial definitions */
             .Define("N_MC", "MC_Px.size()")
             .Define("MC_HasMother", "MC_Mother_McEntry_ >= 0")
             .Define("MC_IsSignal", "MC_Generator == 2")
@@ -244,6 +263,23 @@ RVec<KF_Track> Manager::Tracks_KF_Creator(Double_t pdg_mass, cRVecUL entries_,  
     return output;
 }
 
+RVec<MC_Track> Manager::Linked_MC_Creator(cRVecUL linked_mc_entries_, cRVecL mother_mc_entries_,  //
+                                          cRVecI pdg_code, cRVecI is_secondary, cRVecI is_signal, cRVecU reaction_id) {
+    //
+    RVec<MC_Track> output;
+    output.reserve(linked_mc_entries_.size());
+    MC_Track particle{};
+    for (auto mc_entry : linked_mc_entries_) {
+        particle.mother_entry = mother_mc_entries_[mc_entry];
+        particle.pdg_code = pdg_code[mc_entry];
+        particle.is_secondary = is_secondary[mc_entry];
+        particle.is_signal = is_signal[mc_entry];
+        particle.reaction_id = reaction_id[mc_entry];
+        output.emplace_back(particle);
+    }
+    return output;
+}
+
 RNode Manager::ProcessTracks(RNode df) {
     //
     const Double_t mass_proton = TDatabasePDG::Instance()->GetParticle(2212)->Mass();
@@ -345,9 +381,9 @@ RNode Manager::ProcessTracks(RNode df) {
                                    "Track_CovMatrix", "MagneticField"});
 
     if (Settings::IsMC) {
-        df_Tracks = df_Tracks  //
-                        .Define("Track_PdgCode", Extract<Int_t>, {"MC_PdgCode", "Track_McEntry"})
-                        .Define("Track_IsSignal", Extract<Int_t>, {"MC_IsSignal", "Track_McEntry"});
+        df_Tracks = df_Tracks                                    //
+                        .Define("MC_Tracks", Linked_MC_Creator,  //
+                                {"Track_McEntry_", "MC_Mother_McEntry_", "MC_PdgCode", "MC_IsSecondary", "MC_IsSignal", "MC_ReactionID"});
     }
 
     return df_Tracks;
@@ -357,11 +393,11 @@ RNode Manager::ProcessTracks(RNode df) {
 /**  V0s  **/
 /*** === ***/
 
-RVec<FoundV0> Manager::V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Double_t pos_mass,             //
-                                     const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
-                                     const Float_t &magnetic_field, const XYZPoint &v3_pv) {
-    RVec<FoundV0> output;
-    FoundV0 this_v0;
+RVec<KF_V0> Manager::V0s_KF_Finder(PdgCode pdg_code_v0, Double_t neg_mass, Double_t pos_mass,           //
+                                   const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
+                                   const Float_t &magnetic_field, const XYZPoint &v3_pv) {
+    RVec<KF_V0> output;
+    KF_V0 this_v0;
     KF_Track cp_neg, cp_pos;
     /* protection */
     if (!neg_tracks.size() || !pos_tracks.size()) return output;
@@ -374,17 +410,15 @@ RVec<FoundV0> Manager::V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Doubl
             if (neg.entry == pos.entry) continue;
             cp_neg = neg;
             cp_pos = pos;
-            /* geometry */
-            KFParticle kf_v0;
-            kf_v0.AddDaughter(cp_neg.kf);
-            kf_v0.AddDaughter(cp_pos.kf);
+            /* fit */
+            KFParticle kf_v0(cp_neg.kf, cp_pos.kf);
+            //
             kf_v0.TransportToDecayVertex();
-            /* transport */
             cp_neg.kf.SetProductionVertex(kf_v0);
             cp_pos.kf.SetProductionVertex(kf_v0);
+            /* transport daughters to V0 vertex */
             cp_neg.kf.TransportToProductionVertex();
             cp_pos.kf.TransportToProductionVertex();
-            /* kinematics */
             cp_neg.lv.SetCoordinates(cp_neg.kf.Px(), cp_neg.kf.Py(), cp_neg.kf.Pz(), neg_mass);
             cp_pos.lv.SetCoordinates(cp_pos.kf.Px(), cp_pos.kf.Py(), cp_pos.kf.Pz(), pos_mass);
             /* fill struct */
@@ -401,46 +435,39 @@ RVec<FoundV0> Manager::V0s_KF_Finder(Int_t pdg_code_v0, Double_t neg_mass, Doubl
     return output;
 };
 
-RVec<FoundV0_TrueInfo> Manager::V0s_TrueInfoCollector(Int_t pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
-                                                      const RVec<FoundV0> &found_v0s,                                   //
-                                                      cRVecUL track_mc_entry_, cRVecL mother_mc_entry_,                 //
-                                                      cRVecI pdg_code, cRVecI mc_is_secondary, cRVecI mc_is_signal, cRVecU mc_reaction_id) {
-    RVec<FoundV0_TrueInfo> output;
+RVec<MC_V0> Manager::V0s_TrueInfoCollector(PdgCode pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
+                                           const RVec<KF_V0> &found_v0s, const RVec<MC_Track> &linked_mc,      //
+                                           cRVecI pdg_code, cRVecI is_signal, cRVecU reaction_id) {
+    RVec<MC_V0> output;
     output.reserve(found_v0s.size());
-    FoundV0_TrueInfo this_v0_mc{};
+    MC_V0 mc_v0{};
     for (const auto &found_v0 : found_v0s) {
-        /* defaults */
-        this_v0_mc.entry = -1;
-        this_v0_mc.pdg_code = 0;
-        this_v0_mc.is_secondary = false;
-        this_v0_mc.is_true = false;
-        this_v0_mc.is_signal = false;
-        this_v0_mc.reaction_id = 0;
-        /* fill values */
-        this_v0_mc.neg = track_mc_entry_[found_v0.neg.entry];
-        this_v0_mc.pos = track_mc_entry_[found_v0.pos.entry];
-        this_v0_mc.neg_pdg_code = pdg_code[this_v0_mc.neg];
-        this_v0_mc.pos_pdg_code = pdg_code[this_v0_mc.pos];
-        this_v0_mc.same_mother = mother_mc_entry_[this_v0_mc.neg] == mother_mc_entry_[this_v0_mc.pos];
-        if (this_v0_mc.same_mother) {
-            this_v0_mc.entry = mother_mc_entry_[this_v0_mc.neg];
-            this_v0_mc.pdg_code = pdg_code[this_v0_mc.entry];
-            this_v0_mc.is_secondary = (Bool_t)mc_is_secondary[this_v0_mc.entry];
-            this_v0_mc.is_true =
-                this_v0_mc.neg_pdg_code == pdg_code_neg && this_v0_mc.pos_pdg_code == pdg_code_pos && this_v0_mc.pdg_code == pdg_code_v0;
-            if (this_v0_mc.is_true) {
-                this_v0_mc.is_signal = (Bool_t)mc_is_signal[this_v0_mc.entry];
-                this_v0_mc.reaction_id = mc_reaction_id[this_v0_mc.entry];
+        mc_v0.mc_entry = -1;
+        mc_v0.pdg_code = 0;
+        mc_v0.is_true = false;
+        mc_v0.is_signal = false;
+        mc_v0.reaction_id = 0;
+        /* fill */
+        mc_v0.neg = linked_mc[found_v0.neg.entry];
+        mc_v0.pos = linked_mc[found_v0.pos.entry];
+        mc_v0.has_mc = mc_v0.neg.mother_entry != -1 && mc_v0.neg.mother_entry == mc_v0.pos.mother_entry;
+        if (mc_v0.has_mc) {
+            mc_v0.mc_entry = (Long64_t)mc_v0.neg.mother_entry;
+            mc_v0.pdg_code = pdg_code[mc_v0.mc_entry];
+            mc_v0.is_true = mc_v0.neg.pdg_code == pdg_code_neg && mc_v0.pos.pdg_code == pdg_code_pos && mc_v0.pdg_code == pdg_code_v0;
+            if (mc_v0.is_true) {
+                mc_v0.is_signal = is_signal[mc_v0.mc_entry];
+                mc_v0.reaction_id = reaction_id[mc_v0.mc_entry];
             }
         }
-        this_v0_mc.is_hybrid = !this_v0_mc.is_signal && ((mc_is_signal[this_v0_mc.neg] && !mc_is_signal[this_v0_mc.pos]) ||
-                                                         (!mc_is_signal[this_v0_mc.neg] && mc_is_signal[this_v0_mc.pos]));
-        output.emplace_back(this_v0_mc);
+        mc_v0.is_hybrid = !mc_v0.is_signal &&  //
+                          ((mc_v0.neg.is_signal && !mc_v0.pos.is_signal) || (!mc_v0.neg.is_signal && mc_v0.pos.is_signal));
+        output.emplace_back(mc_v0);
     }
     return output;
 };
 
-Bool_t Manager::V0s_PassesCuts(Int_t pdg_code_v0, const FoundV0 &v0, const XYZPoint &v3_pv) {
+Bool_t Manager::V0s_PassesCuts(PdgCode pdg_code_v0, const KF_V0 &v0, const XYZPoint &v3_pv) {
     //
     XYZPoint v3_v0(v0.kf.GetX(), v0.kf.GetY(), v0.kf.GetZ());
     /* -- (anti)lambda cuts */
@@ -492,7 +519,7 @@ Bool_t Manager::V0s_PassesCuts(Int_t pdg_code_v0, const FoundV0 &v0, const XYZPo
 /*
  * Find all V0s via Kalman Filter.
  */
-RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pdg_code_pos) {
+RNode Manager::FindV0s(RNode df, PdgCode pdg_code_v0, PdgCode pdg_code_neg, PdgCode pdg_code_pos) {
     //
     const Double_t neg_mass = TDatabasePDG::Instance()->GetParticle(pdg_code_neg)->Mass();
     const Double_t pos_mass = TDatabasePDG::Instance()->GetParticle(pdg_code_pos)->Mass();
@@ -514,103 +541,92 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pd
     fAnalyzed_V0sNames.push_back(v0_name);
     //
     auto CallV0Finder = [pdg_code_v0, neg_mass, pos_mass](const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
-                                                          const Float_t &magnetic_field, const XYZPoint &v3_pv) -> RVec<FoundV0> {
+                                                          const Float_t &magnetic_field, const XYZPoint &v3_pv) -> RVec<KF_V0> {
         return V0s_KF_Finder(pdg_code_v0, neg_mass, pos_mass, neg_tracks, pos_tracks, magnetic_field, v3_pv);
     };
     //
-    auto CallTrueCollector = [pdg_code_v0, pdg_code_neg, pdg_code_pos](const RVec<FoundV0> &found_v0s, cRVecUL track_mc_entry_,
-                                                                       cRVecL mother_mc_entry_, cRVecI pdg_code, cRVecI mc_is_secondary,
-                                                                       cRVecI mc_is_signal, cRVecU mc_reaction_id) -> RVec<FoundV0_TrueInfo> {
-        return V0s_TrueInfoCollector(pdg_code_v0, pdg_code_neg, pdg_code_pos, found_v0s, track_mc_entry_, mother_mc_entry_, pdg_code, mc_is_secondary,
-                                     mc_is_signal, mc_reaction_id);
+    auto CallTrueCollector = [pdg_code_v0, pdg_code_neg, pdg_code_pos](const RVec<KF_V0> &found_v0s, const RVec<MC_Track> &linked_mc,  //
+                                                                       cRVecI pdg_code, cRVecI is_signal, cRVecU reaction_id) -> RVec<MC_V0> {
+        return V0s_TrueInfoCollector(pdg_code_v0, pdg_code_neg, pdg_code_pos,  //
+                                     found_v0s, linked_mc,                     //
+                                     pdg_code, is_signal, reaction_id);
     };
 
     RNode df_V0s =
         df.Define("Found_" + v0_name, CallV0Finder, {"KF_" + neg_name, "KF_" + pos_name, "MagneticField", "Event_PV"})
-            .Define(v0_name + "_Neg_TrackEntry", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.neg.entry; }); },
+            .Define(v0_name + "_Neg_TrackEntry", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.neg.entry; }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Pos_TrackEntry", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.pos.entry; }); },
+            .Define(v0_name + "_Pos_TrackEntry", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.pos.entry; }); },
                     {"Found_" + v0_name})
+#if READ_ESD_INDICES
             .Define(v0_name + "_Neg_EsdIdx",
-                    [](const RVec<FoundV0> &v0s, cRVecL track_esd_idx) {
-                        return Map(v0s, [&track_esd_idx](const FoundV0 &v0) { return track_esd_idx[v0.neg.entry]; });
+                    [](const RVec<KF_V0> &v0s, cRVecL track_esd_idx) {
+                        return Map(v0s, [&track_esd_idx](const KF_V0 &v0) { return track_esd_idx[v0.neg.entry]; });
                     },
                     {"Found_" + v0_name, "Track_EsdIdx"})
             .Define(v0_name + "_Pos_EsdIdx",
-                    [](const RVec<FoundV0> &v0s, cRVecL track_esd_idx) {
-                        return Map(v0s, [&track_esd_idx](const FoundV0 &v0) { return track_esd_idx[v0.pos.entry]; });
+                    [](const RVec<KF_V0> &v0s, cRVecL track_esd_idx) {
+                        return Map(v0s, [&track_esd_idx](const KF_V0 &v0) { return track_esd_idx[v0.pos.entry]; });
                     },
                     {"Found_" + v0_name, "Track_EsdIdx"})
-            .Define(v0_name + "_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Px(); }); },
+#endif
+            .Define(v0_name + "_Px", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.lv.Px(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Py(); }); },
+            .Define(v0_name + "_Py", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.lv.Py(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.Pz(); }); },
+            .Define(v0_name + "_Pz", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.lv.Pz(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Neg_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.neg.lv.Px(); }); },
+            .Define(v0_name + "_Neg_Px", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.neg.lv.Px(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Neg_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.neg.lv.Py(); }); },
+            .Define(v0_name + "_Neg_Py", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.neg.lv.Py(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Neg_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.neg.lv.Pz(); }); },
+            .Define(v0_name + "_Neg_Pz", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.neg.lv.Pz(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Pos_Px", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.pos.lv.Px(); }); },
+            .Define(v0_name + "_Pos_Px", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.pos.lv.Px(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Pos_Py", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.pos.lv.Py(); }); },
+            .Define(v0_name + "_Pos_Py", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.pos.lv.Py(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Pos_Pz", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.pos.lv.Pz(); }); },
+            .Define(v0_name + "_Pos_Pz", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.pos.lv.Pz(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Xv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetX(); }); },
+            .Define(v0_name + "_Xv", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.kf.GetX(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Yv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetY(); }); },
+            .Define(v0_name + "_Yv", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.kf.GetY(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Zv", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.kf.GetZ(); }); },
+            .Define(v0_name + "_Zv", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.kf.GetZ(); }); },
                     {"Found_" + v0_name})
-            .Define(v0_name + "_Mass", [](const RVec<FoundV0> &v0s) { return Map(v0s, [](const FoundV0 &v0) { return v0.lv.M(); }); },
+            .Define(v0_name + "_Mass", [](const RVec<KF_V0> &v0s) { return Map(v0s, [](const KF_V0 &v0) { return v0.lv.M(); }); },
                     {"Found_" + v0_name})  // DEBUG
             .Define(v0_name + "_Radius",
-                    [](const RVec<FoundV0> &v0s) {
-                        return Map(v0s, [](const FoundV0 &v0) { return TMath::Sqrt(v0.kf.GetX() * v0.kf.GetX() + v0.kf.GetY() * v0.kf.GetY()); });
+                    [](const RVec<KF_V0> &v0s) {
+                        return Map(v0s, [](const KF_V0 &v0) { return TMath::Sqrt(v0.kf.GetX() * v0.kf.GetX() + v0.kf.GetY() * v0.kf.GetY()); });
                     },
                     {"Found_" + v0_name});  // DEBUG
 
     if (Settings::IsMC) {
         df_V0s =
-            df_V0s  //
-                .Define(v0_name + "_TrueInfo", CallTrueCollector,
-                        {"Found_" + v0_name, "Track_McEntry_", "MC_Mother_McEntry_", "MC_PdgCode", "MC_IsSecondary", "MC_IsSignal", "MC_ReactionID"})
-                .Define(v0_name + "_Neg_McEntry",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.neg; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_Pos_McEntry",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.pos; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_McEntry",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.entry; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_PdgCode",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.pdg_code; }); },
-                        {v0_name + "_TrueInfo"})
+            df_V0s                                           //
+                .Define("MC_" + v0_name, CallTrueCollector,  //
+                        {"Found_" + v0_name, "MC_Tracks", "MC_PdgCode", "MC_IsSignal", "MC_ReactionID"})
+                .Define(v0_name + "_Neg_McEntry", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.neg.entry; }); },
+                        {"MC_" + v0_name})
+                .Define(v0_name + "_Pos_McEntry", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.pos.entry; }); },
+                        {"MC_" + v0_name})
+                .Define(v0_name + "_McEntry", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.mc_entry; }); },
+                        {"MC_" + v0_name})
+                .Define(v0_name + "_PdgCode", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.pdg_code; }); },
+                        {"MC_" + v0_name})
                 .Define(v0_name + "_Neg_PdgCode",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.neg_pdg_code; }); },
-                        {v0_name + "_TrueInfo"})
+                        [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.neg.pdg_code; }); }, {"MC_" + v0_name})
                 .Define(v0_name + "_Pos_PdgCode",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.pos_pdg_code; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_IsTrue",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.is_true; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_IsSignal",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.is_signal; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_IsSecondary",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.is_secondary; }); },
-                        {v0_name + "_TrueInfo"})
-                .Define(v0_name + "_IsHybrid",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.is_hybrid; }); },
-                        {v0_name + "_TrueInfo"})
+                        [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.pos.pdg_code; }); }, {"MC_" + v0_name})
+                .Define(v0_name + "_IsTrue", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.is_true; }); },
+                        {"MC_" + v0_name})
+                .Define(v0_name + "_IsSignal", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.is_signal; }); },
+                        {"MC_" + v0_name})
+                .Define(v0_name + "_IsHybrid", [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.is_hybrid; }); },
+                        {"MC_" + v0_name})
                 .Define(v0_name + "_ReactionID",
-                        [](const RVec<FoundV0_TrueInfo> &v0s) { return Map(v0s, [](const FoundV0_TrueInfo &v0_mc) { return v0_mc.reaction_id; }); },
-                        {v0_name + "_TrueInfo"});
+                        [](const RVec<MC_V0> &v0s) { return Map(v0s, [](const MC_V0 &mc_v0) { return mc_v0.reaction_id; }); }, {"MC_" + v0_name});
     }
 
     return df_V0s;
@@ -620,11 +636,18 @@ RNode Manager::FindV0s(RNode df, Int_t pdg_code_v0, Int_t pdg_code_neg, Int_t pd
 /**  Sexaquarks  **/
 /*** ========== ***/
 
-RVec<TypeA> Manager::TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<FoundV0> &found_v0b,  //
+/** # Channel A **/
+
+/*
+ * Using Kalman Filter, reconstruct (anti)sexaquark candidates via the reaction channels
+ * - `AntiSexaquark Neutron -> AntiLambda K0S`
+ * - `X -> Lambda K0S`
+ */
+RVec<TypeA> Manager::TypeA_KF_Finder(const RVec<KF_V0> &found_v0a, const RVec<KF_V0> &found_v0b,  //
                                      const Float_t &magnetic_field, const KFVertex &kf_pv) {
     RVec<TypeA> output;
     TypeA this_sexa;
-    FoundV0 cp_v0a, cp_v0b;
+    KF_V0 cp_v0a, cp_v0b;
     /* protection */
     if (!found_v0a.size() || !found_v0b.size()) return output;
     /* one-time definitions */
@@ -641,7 +664,7 @@ RVec<TypeA> Manager::TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<
             /* fit */
             KFParticle kf_sexa(cp_v0a.kf, cp_v0b.kf);
             kf_sexa.SetProductionVertex(kf_pv);
-            /* transport */
+            //
             kf_sexa.TransportToDecayVertex();
             cp_v0a.kf.SetProductionVertex(kf_sexa);
             cp_v0b.kf.SetProductionVertex(kf_sexa);
@@ -682,29 +705,25 @@ RVec<TypeA> Manager::TypeA_KF_Finder(const RVec<FoundV0> &found_v0a, const RVec<
     return output;
 }
 
-RVec<TypeA_TrueInfo> Manager::TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
-                                                      const RVec<FoundV0_TrueInfo> &v0a_mc, const RVec<FoundV0_TrueInfo> &v0b_mc) {
-    RVec<TypeA_TrueInfo> output;
+RVec<MC_TypeA> Manager::TypeA_TrueInfoCollector(const RVec<TypeA> &found,  //
+                                                const RVec<MC_V0> &mc_v0a, const RVec<MC_V0> &mc_v0b) {
+    RVec<MC_TypeA> output;
     output.reserve(found.size());
-    TypeA_TrueInfo this_sexa_mc{};
-    /* auxiliar vars */
-    Bool_t same_reaction_id;
+    MC_TypeA mc_sexa{};
     for (const auto &found_sexa : found) {
-        /* defaults */
-        this_sexa_mc.reaction_id = 0;
-        this_sexa_mc.is_signal = false;
+        mc_sexa.reaction_id = 0;
+        mc_sexa.is_signal = false;
         /* fill values */
-        this_sexa_mc.v0a_mc = v0a_mc[found_sexa.v0a.idx];
-        this_sexa_mc.v0b_mc = v0b_mc[found_sexa.v0b.idx];
-        same_reaction_id = this_sexa_mc.v0a_mc.reaction_id == this_sexa_mc.v0b_mc.reaction_id;
-        if (same_reaction_id) {
-            this_sexa_mc.reaction_id = this_sexa_mc.v0a_mc.reaction_id;
-            this_sexa_mc.is_signal = this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal;
+        mc_sexa.mc_v0a = mc_v0a[found_sexa.v0a.idx];
+        mc_sexa.mc_v0b = mc_v0b[found_sexa.v0b.idx];
+        if (mc_sexa.mc_v0a.reaction_id == mc_sexa.mc_v0b.reaction_id) {
+            mc_sexa.reaction_id = mc_sexa.mc_v0a.reaction_id;
+            mc_sexa.is_signal = mc_sexa.mc_v0a.is_signal && mc_sexa.mc_v0b.is_signal;
         }
-        this_sexa_mc.is_hybrid = (!this_sexa_mc.is_signal && ((this_sexa_mc.v0a_mc.is_signal && !this_sexa_mc.v0b_mc.is_signal) ||
-                                                              (!this_sexa_mc.v0a_mc.is_signal && this_sexa_mc.v0b_mc.is_signal))) ||
-                                 this_sexa_mc.v0a_mc.is_hybrid || this_sexa_mc.v0b_mc.is_hybrid;
-        output.emplace_back(this_sexa_mc);
+        mc_sexa.is_hybrid = !mc_sexa.is_signal &&
+                            ((mc_sexa.mc_v0a.is_signal && !mc_sexa.mc_v0b.is_signal) || (!mc_sexa.mc_v0a.is_signal && mc_sexa.mc_v0b.is_signal) ||  //
+                             mc_sexa.mc_v0a.is_hybrid || mc_sexa.mc_v0b.is_hybrid);
+        output.emplace_back(mc_sexa);
     }
     return output;
 }
@@ -735,23 +754,15 @@ Bool_t Manager::TypeA_PassesCuts(const TypeA &sexa, const KFVertex &kf_pv) {
     return kTRUE;
 }
 
-/*
- * Using Kalman Filter, reconstruct (anti)sexaquark candidates via the reaction channels
- * - `AntiSexaquark Neutron -> AntiLambda K0S`
- * - `X -> Lambda K0S`
- */
-RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
+RNode Manager::FindSexaquarks_TypeA(RNode df, PdgCode pdg_struck_nucleon, const std::vector<PdgCode> &pdg_reaction_products) {
     //
     std::string sexaquark_name;
-    std::string v0a_name;
-    if (!anti_channel) {
+    if (pdg_struck_nucleon > 0)
         sexaquark_name = "ASA";  // antisexaquark type a
-        v0a_name = "AL";         // antilambda
-    } else {
+    else
         sexaquark_name = "BA";  // background type a
-        v0a_name = "L";         // lambda
-    }
-    std::string v0b_name = "K0S";  // kaonzeroshort
+    std::string v0a_name = fParticleName_[pdg_reaction_products[0]];
+    std::string v0b_name = fParticleName_[pdg_reaction_products[1]];
     fAnalyzed_Channels.push_back(sexaquark_name);
 
     RNode df_Sexaquarks = df.Define("Found_" + sexaquark_name, TypeA_KF_Finder,  //
@@ -784,65 +795,228 @@ RNode Manager::FindSexaquarks_TypeA(RNode df, Bool_t anti_channel) {
 
     if (Settings::IsMC) {
         df_Sexaquarks =
-            df_Sexaquarks
-                .Define(sexaquark_name + "_TrueInfo", TypeA_TrueInfoCollector,
-                        {"Found_" + sexaquark_name, v0a_name + "_TrueInfo", v0b_name + "_TrueInfo"})
+            df_Sexaquarks.Define("MC_" + sexaquark_name, TypeA_TrueInfoCollector, {"Found_" + sexaquark_name, "MC_" + v0a_name, "MC_" + v0b_name})
                 .Define(sexaquark_name + "_V0a_Neg_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0a_mc.neg; });
+                        [](const RVec<MC_TypeA> &sexaquarks) {
+                            return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0a.neg.entry; });
                         },
-                        {sexaquark_name + "_TrueInfo"})
+                        {"MC_" + sexaquark_name})
                 .Define(sexaquark_name + "_V0a_Pos_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0a_mc.pos; });
+                        [](const RVec<MC_TypeA> &sexaquarks) {
+                            return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0a.pos.entry; });
                         },
-                        {sexaquark_name + "_TrueInfo"})
+                        {"MC_" + sexaquark_name})
                 .Define(sexaquark_name + "_V0b_Neg_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0b_mc.neg; });
+                        [](const RVec<MC_TypeA> &sexaquarks) {
+                            return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0b.neg.entry; });
                         },
-                        {sexaquark_name + "_TrueInfo"})
+                        {"MC_" + sexaquark_name})
                 .Define(sexaquark_name + "_V0b_Pos_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0b_mc.pos; });
+                        [](const RVec<MC_TypeA> &sexaquarks) {
+                            return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0b.pos.entry; });
                         },
-                        {sexaquark_name + "_TrueInfo"})
-                .Define(sexaquark_name + "_V0a_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0a_mc.entry; });
-                        },
-                        {sexaquark_name + "_TrueInfo"})
-                .Define(sexaquark_name + "_V0b_McEntry",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.v0b_mc.entry; });
-                        },
-                        {sexaquark_name + "_TrueInfo"})
+                        {"MC_" + sexaquark_name})
                 .Define(
-                    sexaquark_name + "_IsSignal",
-                    [](const RVec<TypeA_TrueInfo> &sexaquarks) { return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.is_signal; }); },
-                    {sexaquark_name + "_TrueInfo"})
+                    sexaquark_name + "_V0a_McEntry",
+                    [](const RVec<MC_TypeA> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0a.mc_entry; }); },
+                    {"MC_" + sexaquark_name})
+                .Define(
+                    sexaquark_name + "_V0b_McEntry",
+                    [](const RVec<MC_TypeA> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.mc_v0b.mc_entry; }); },
+                    {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_IsSignal",
+                        [](const RVec<MC_TypeA> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.is_signal; }); },
+                        {"MC_" + sexaquark_name})
                 .Define(sexaquark_name + "_ReactionID",
-                        [](const RVec<TypeA_TrueInfo> &sexaquarks) {
-                            return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.reaction_id; });
-                        },
-                        {sexaquark_name + "_TrueInfo"})
-                .Define(
-                    sexaquark_name + "_IsHybrid",
-                    [](const RVec<TypeA_TrueInfo> &sexaquarks) { return Map(sexaquarks, [](const TypeA_TrueInfo &sexa) { return sexa.is_hybrid; }); },
-                    {sexaquark_name + "_TrueInfo"});
+                        [](const RVec<MC_TypeA> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.reaction_id; }); },
+                        {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_IsHybrid",
+                        [](const RVec<MC_TypeA> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeA &mc_sexa) { return mc_sexa.is_hybrid; }); },
+                        {"MC_" + sexaquark_name});
     }
 
     return df_Sexaquarks;
 }
 
-RNode Manager::FindSexaquarks_TypeDE(RNode df, Bool_t anti_channel) {
-    //
-    return df;
+/** # Channel D **/
+
+/*
+ * Using Kalman Filter, reconstruct (anti)sexaquark candidates via the reaction channels
+ * - `AntiSexaquark Proton -> AntiLambda K+`
+ * - `X -> Lambda K-`
+ */
+RVec<TypeD> Manager::TypeD_KF_Finder(const RVec<KF_V0> &found_v0s, const RVec<KF_Track> &bach_tracks,  //
+                                     const Float_t &magnetic_field, const KFVertex &kf_pv) {
+    RVec<TypeD> output;
+    TypeD this_sexa;
+    KF_V0 cp_v0;
+    KF_Track cp_ba;
+    /* protection */
+    if (!found_v0s.size() || !bach_tracks.size()) return output;
+    /* one-time definitions */
+    KFParticle::SetField(magnetic_field);
+    const Double_t proton_mass = TDatabasePDG::Instance()->GetParticle(PdgCode::Proton)->Mass();
+    /* loop over all pairs */
+    for (const auto &v0 : found_v0s) {
+        for (const auto &ba : bach_tracks) {
+            /* sanity check */
+            std::set<ULong64_t> unique_track_entries = {v0.neg.entry, v0.pos.entry, ba.entry};
+            if (unique_track_entries.size() != 3) continue;
+            cp_v0 = v0;
+            cp_ba = ba;
+            /* fit */
+            KFParticle kf_sexa(cp_v0.kf, cp_ba.kf);
+            kf_sexa.SetProductionVertex(kf_pv);
+            //
+            kf_sexa.TransportToDecayVertex();
+            cp_v0.kf.SetProductionVertex(kf_sexa);
+            cp_ba.kf.SetProductionVertex(kf_sexa);
+            //
+            cp_v0.kf.TransportToDecayVertex();
+            cp_v0.neg.kf.SetProductionVertex(cp_v0.kf);
+            cp_v0.pos.kf.SetProductionVertex(cp_v0.kf);
+            /* transport daughters to V0 vertex */
+            cp_v0.neg.kf.TransportToProductionVertex();
+            cp_v0.pos.kf.TransportToProductionVertex();
+            cp_v0.neg.lv.SetCoordinates(cp_v0.neg.kf.Px(), cp_v0.neg.kf.Py(), cp_v0.neg.kf.Pz(), cp_v0.neg.lv.M());
+            cp_v0.pos.lv.SetCoordinates(cp_v0.pos.kf.Px(), cp_v0.pos.kf.Py(), cp_v0.pos.kf.Pz(), cp_v0.pos.lv.M());
+            /* transport V0 and bachelor to secondary vertex */
+            cp_v0.kf.TransportToProductionVertex();
+            cp_v0.kf.TransportToProductionVertex();
+            cp_ba.kf.TransportToProductionVertex();
+            cp_v0.lv = PxPyPzEVector(cp_v0.kf.Px(), cp_v0.kf.Py(), cp_v0.kf.Pz(), cp_v0.kf.E());
+            cp_ba.lv.SetCoordinates(cp_ba.kf.Px(), cp_ba.kf.Py(), cp_ba.kf.Pz(), cp_ba.lv.M());
+            /* fill struct */
+            this_sexa.v0 = cp_v0;
+            this_sexa.ba = cp_ba;
+            this_sexa.kf = kf_sexa;
+            this_sexa.lv = PxPyPzEVector(cp_v0.lv.Px() + cp_ba.lv.Px(), cp_v0.lv.Py() + cp_ba.lv.Py(), cp_v0.lv.Pz() + cp_ba.lv.Pz(),
+                                         cp_v0.lv.E() + cp_ba.lv.E() - proton_mass);
+            this_sexa.lv_asdecay = cp_v0.lv + cp_ba.lv;
+            /* apply cuts and store */
+            if (!TypeD_PassesCuts(this_sexa, kf_pv)) continue;
+            output.push_back(this_sexa);
+        }  // end of loop over charged kaons
+    }      // end of loop over (anti)lambdas
+    return output;
 }
 
-RNode Manager::FindSexaquarks_TypeH(RNode df, Bool_t anti_channel) {
+RVec<MC_TypeD> Manager::TypeD_TrueInfoCollector(const RVec<TypeD> &found,  //
+                                                const RVec<MC_V0> &mc_v0, const RVec<MC_Track> &mc_ba) {
+    RVec<MC_TypeD> output;
+    output.reserve(found.size());
+    MC_TypeD mc_sexa{};
+    for (const auto &found_sexa : found) {
+        mc_sexa.reaction_id = 0;
+        mc_sexa.is_signal = false;
+        /* fill values */
+        mc_sexa.mc_v0 = mc_v0[found_sexa.v0.idx];
+        mc_sexa.mc_ba = mc_ba[found_sexa.ba.entry];
+        if (mc_sexa.mc_v0.reaction_id == mc_sexa.mc_ba.reaction_id) {
+            mc_sexa.reaction_id = mc_sexa.mc_v0.reaction_id;
+            mc_sexa.is_signal = mc_sexa.mc_v0.is_signal && mc_sexa.mc_ba.is_signal;
+        }
+        mc_sexa.is_hybrid = !mc_sexa.is_signal &&  //
+                            ((mc_sexa.mc_v0.is_signal && !mc_sexa.mc_ba.is_signal) || (!mc_sexa.mc_v0.is_signal && mc_sexa.mc_ba.is_signal) ||
+                             mc_sexa.mc_v0.is_hybrid);
+        output.emplace_back(mc_sexa);
+    }
+    return output;
+}
+
+Bool_t Manager::TypeD_PassesCuts(const TypeD &sexa, const KFVertex &kf_pv) {
     //
-    return df;
+    XYZPoint v3_sexa(sexa.kf.GetX(), sexa.kf.GetY(), sexa.kf.GetZ());
+    XYZPoint v3_pv(kf_pv.GetX(), kf_pv.GetY(), kf_pv.GetZ());
+    /*  */
+    if (v3_sexa.Rho() < Default::ChannelD::MinRadius) return kFALSE;
+    if (TMath::Abs(sexa.lv.Rapidity()) > Default::ChannelD::AbsMaxRapidity) return kFALSE;
+    /*  */ Double_t cpa_wrt_pv = Math::CosinePointingAngle(sexa.lv.Vect(), v3_sexa, v3_pv);
+    if (cpa_wrt_pv < Default::ChannelD::MinCPAwrtPV || cpa_wrt_pv > Default::ChannelD::MaxCPAwrtPV) return kFALSE;
+    /*  */ Double_t dca_la_sv = TMath::Abs((Double_t)sexa.v0.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_sv > Default::ChannelD::MaxDCALaSV) return kFALSE;
+    /*  */ Double_t dca_la_neg_sv = TMath::Abs((Double_t)sexa.v0.neg.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_neg_sv > Default::ChannelD::MaxDCALaNegSV) return kFALSE;
+    /*  */ Double_t dca_la_pos_sv = TMath::Abs((Double_t)sexa.v0.pos.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_la_pos_sv > Default::ChannelD::MaxDCALaPosSV) return kFALSE;
+    /*  */ Double_t dca_ka_sv = TMath::Abs((Double_t)sexa.ba.kf.GetDistanceFromVertex(sexa.kf));
+    if (dca_ka_sv > Default::ChannelD::MaxDCAKaSV) return kFALSE;
+    /*  */ Double_t dca_ka_la = TMath::Abs((Double_t)sexa.ba.kf.GetDistanceFromVertex(sexa.v0.kf));
+    if (dca_ka_la > Default::ChannelD::MaxDCAKaLa) return kFALSE;
+    return kTRUE;
+}
+
+RNode Manager::FindSexaquarks_TypeD(RNode df, PdgCode pdg_struck_nucleon, const std::vector<PdgCode> &pdg_reaction_products) {
+    //
+    std::string sexaquark_name;
+    if (pdg_struck_nucleon > 0)
+        sexaquark_name = "ASD";  // antisexaquark type d
+    else
+        sexaquark_name = "BD";  // background type d
+    fAnalyzed_Channels.push_back(sexaquark_name);
+    std::string v0_name = fParticleName_[pdg_reaction_products[0]];
+    std::string bach_name = fParticleName_[pdg_reaction_products[1]];
+
+    RNode df_Sexaquarks = df.Define("Found_" + sexaquark_name, TypeD_KF_Finder,  //
+                                    {"Found_" + v0_name, "KF_" + bach_name, "MagneticField", "Event_KF_PV"})
+                              .Define(sexaquark_name + "_V0_Idx",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.v0.idx; }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Ba_Entry",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.ba.entry; }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Mass",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.lv.M(); }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Pt",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.lv.Pt(); }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Xv",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.kf.GetX(); }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Yv",
+                                      [](const RVec<TypeD> &sexaquarks) { return Map(sexaquarks, [](const TypeD &sexa) { return sexa.kf.GetY(); }); },
+                                      {"Found_" + sexaquark_name})
+                              .Define(sexaquark_name + "_Radius",
+                                      [](const RVec<TypeD> &sexaquarks) {
+                                          return Map(sexaquarks, [](const TypeD &sexa) {
+                                              return TMath::Sqrt(sexa.kf.GetX() * sexa.kf.GetX() + sexa.kf.GetY() * sexa.kf.GetY());
+                                          });
+                                      },
+                                      {"Found_" + sexaquark_name});
+
+    if (Settings::IsMC) {
+        df_Sexaquarks =
+            df_Sexaquarks
+                .Define("MC_" + sexaquark_name, TypeD_TrueInfoCollector,  //
+                        {"Found_" + sexaquark_name, "MC_" + v0_name, "MC_Tracks"})
+                .Define(
+                    sexaquark_name + "_V0_Neg_McEntry",
+                    [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.mc_v0.neg.entry; }); },
+                    {"MC_" + sexaquark_name})
+                .Define(
+                    sexaquark_name + "_V0_Pos_McEntry",
+                    [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.mc_v0.pos.entry; }); },
+                    {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_Ba_McEntry",
+                        [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.mc_ba.entry; }); },
+                        {"MC_" + sexaquark_name})
+                .Define(
+                    sexaquark_name + "_V0_McEntry",
+                    [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.mc_v0.mc_entry; }); },
+                    {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_IsSignal",
+                        [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.is_signal; }); },
+                        {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_ReactionID",
+                        [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.reaction_id; }); },
+                        {"MC_" + sexaquark_name})
+                .Define(sexaquark_name + "_IsHybrid",
+                        [](const RVec<MC_TypeD> &sexaquarks) { return Map(sexaquarks, [](const MC_TypeD &mc_sexa) { return mc_sexa.is_hybrid; }); },
+                        {"MC_" + sexaquark_name});
+    }
+
+    return df_Sexaquarks;
 }
 
 /*           */
@@ -952,29 +1126,48 @@ void Manager::EndOfAnalysis(RNode df) {
     std::vector<std::string> column_list;
     /* Add V0s Properties */
     for (const auto &v0_name : fAnalyzed_V0sNames) {
-        column_list.insert(column_list.end(), {v0_name + "_Neg_TrackEntry", v0_name + "_Pos_TrackEntry",       //
-                                               v0_name + "_Neg_EsdIdx", v0_name + "_Pos_EsdIdx",               //
-                                               v0_name + "_Px", v0_name + "_Py", v0_name + "_Pz",              //
-                                               v0_name + "_Neg_Px", v0_name + "_Neg_Py", v0_name + "_Neg_Pz",  //
-                                               v0_name + "_Pos_Px", v0_name + "_Pos_Py", v0_name + "_Pos_Pz",  //
-                                               v0_name + "_Xv", v0_name + "_Yv", v0_name + "_Zv",              //
-                                               v0_name + "_Mass", v0_name + "_Radius"});
+        column_list.insert(column_list.end(), {
+            v0_name + "_Neg_TrackEntry", v0_name + "_Pos_TrackEntry",  //
+#if READ_ESD_INDICES
+                v0_name + "_Neg_EsdIdx", v0_name + "_Pos_EsdIdx",  //
+#endif
+                v0_name + "_Px", v0_name + "_Py", v0_name + "_Pz",              //
+                v0_name + "_Neg_Px", v0_name + "_Neg_Py", v0_name + "_Neg_Pz",  //
+                v0_name + "_Pos_Px", v0_name + "_Pos_Py", v0_name + "_Pos_Pz",  //
+                v0_name + "_Xv", v0_name + "_Yv", v0_name + "_Zv",              //
+                v0_name + "_Mass", v0_name + "_Radius"
+        });
         if (Settings::IsMC) {
-            column_list.insert(column_list.end(), {v0_name + "_Neg_McEntry", v0_name + "_Pos_McEntry", v0_name + "_McEntry", v0_name + "_PdgCode",
-                                                   v0_name + "_Neg_PdgCode", v0_name + "_Pos_PdgCode", v0_name + "_IsTrue", v0_name + "_IsSignal",
-                                                   v0_name + "_IsSecondary", v0_name + "_IsHybrid", v0_name + "_ReactionID"});
+            column_list.insert(column_list.end(),
+                               {v0_name + "_Neg_McEntry", v0_name + "_Pos_McEntry", v0_name + "_Neg_PdgCode", v0_name + "_Pos_PdgCode",  //
+                                v0_name + "_McEntry", v0_name + "_PdgCode", v0_name + "_IsTrue", v0_name + "_IsSignal", v0_name + "_IsHybrid",
+                                v0_name + "_ReactionID"});
         }
     }
     /* Add (Anti)Sexaquarks Properties */
     for (const auto &channel_name : fAnalyzed_Channels) {
-        column_list.insert(column_list.end(), {channel_name + "_V0a_Idx", channel_name + "_V0b_Idx",  //
-                                               channel_name + "_Xv", channel_name + "_Yv",            //
-                                               channel_name + "_Mass", channel_name + "_Pt", channel_name + "_Radius"});
-        if (Settings::IsMC) {
-            column_list.insert(column_list.end(),
-                               {channel_name + "_V0a_Neg_McEntry", channel_name + "_V0a_Pos_McEntry", channel_name + "_V0b_Neg_McEntry",
-                                channel_name + "_V0b_Pos_McEntry", channel_name + "_V0a_McEntry", channel_name + "_V0b_McEntry",
-                                channel_name + "_IsSignal", channel_name + "_ReactionID", channel_name + "_IsHybrid"});
+        /* -- Channel A */
+        if (channel_name.back() == 'A') {
+            column_list.insert(column_list.end(), {channel_name + "_V0a_Idx", channel_name + "_V0b_Idx",  //
+                                                   channel_name + "_Xv", channel_name + "_Yv",            //
+                                                   channel_name + "_Mass", channel_name + "_Pt", channel_name + "_Radius"});
+            if (Settings::IsMC) {
+                column_list.insert(column_list.end(),
+                                   {channel_name + "_V0a_Neg_McEntry", channel_name + "_V0a_Pos_McEntry", channel_name + "_V0b_Neg_McEntry",
+                                    channel_name + "_V0b_Pos_McEntry", channel_name + "_V0a_McEntry", channel_name + "_V0b_McEntry",
+                                    channel_name + "_IsSignal", channel_name + "_ReactionID", channel_name + "_IsHybrid"});
+            }
+        }
+        /* -- Channel D */
+        if (channel_name.back() == 'D') {
+            column_list.insert(column_list.end(), {channel_name + "_V0_Idx", channel_name + "_Ba_Entry",  //
+                                                   channel_name + "_Xv", channel_name + "_Yv",            //
+                                                   channel_name + "_Mass", channel_name + "_Pt", channel_name + "_Radius"});
+            if (Settings::IsMC) {
+                column_list.insert(column_list.end(), {channel_name + "_V0_Neg_McEntry", channel_name + "_V0_Pos_McEntry",
+                                                       channel_name + "_Ba_McEntry", channel_name + "_V0_McEntry", channel_name + "_IsSignal",
+                                                       channel_name + "_ReactionID", channel_name + "_IsHybrid"});
+            }
         }
     }
     /* Write to disk */
