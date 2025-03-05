@@ -143,18 +143,18 @@ class Manager {
     static RVec<KF_V0> V0s_KF_Finder(PdgCode pdg_code_v0, Double_t neg_mass, Double_t pos_mass,           //
                                      const RVec<KF_Track> &neg_tracks, const RVec<KF_Track> &pos_tracks,  //
                                      const Float_t &magnetic_field, const XYZPoint &v3_pv);
-    static RVec<MC_V0> V0s_TrueInfoCollector(PdgCode pdg_code_v0, Double_t pdg_code_neg, Double_t pdg_code_pos,  //
-                                             const RVec<KF_V0> &found_v0s, const RVec<MC_Track> &linked_mc,      //
+    static RVec<MC_V0> V0s_TrueInfoCollector(PdgCode pdg_code_v0, PdgCode pdg_code_neg, PdgCode pdg_code_pos,  //
+                                             const RVec<KF_V0> &found_v0s, const RVec<MC_Track> &linked_mc,    //
                                              cRVecI pdg_code, cRVecI is_signal, cRVecU reaction_id);
     static Bool_t V0s_PassesCuts(PdgCode pdg_code_v0, const KF_V0 &v0, const XYZPoint &v3_pv);
     RNode FindV0s(RNode df, PdgCode pdg_code_v0, PdgCode pdg_code_neg, PdgCode pdg_code_pos);
 
     /* Sexaquarks */
-    RNode FindSexaquarks(const RNode &data_frame, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products) {
-        if (TMath::Abs(struck_nucleon) == PdgCode::Neutron) {
-            return FindSexaquarks_TypeA(data_frame, struck_nucleon, reaction_products);
+    RNode FindSexaquarks(const RNode &data_frame, PdgCode pdg_struck_nucleon, const std::vector<PdgCode> &pdg_reaction_products) {
+        if (TMath::Abs(pdg_struck_nucleon) == PdgCode::Neutron) {
+            return FindSexaquarks_TypeA(data_frame, pdg_struck_nucleon, pdg_reaction_products);
         } else {  // if (TMath::Abs(struck_nucleon) == PdgCode::Proton)
-            return FindSexaquarks_TypeD(data_frame, struck_nucleon, reaction_products);
+            return FindSexaquarks_TypeD(data_frame, pdg_struck_nucleon, pdg_reaction_products);
         }
     }
     /* -- Type A */
@@ -166,7 +166,7 @@ class Manager {
     /* -- Type D */
     static RVec<TypeD> TypeD_KF_Finder(const RVec<KF_V0> &found_v0s, const RVec<KF_Track> &bach_tracks,  //
                                        const Float_t &magnetic_field, const KFVertex &kf_pv);
-    static RVec<MC_TypeD> TypeD_TrueInfoCollector(const RVec<TypeD> &found,  //
+    static RVec<MC_TypeD> TypeD_TrueInfoCollector(PdgCode pdg_code_bach, const RVec<TypeD> &found,  //
                                                   const RVec<MC_V0> &mc_v0, const RVec<MC_Track> &mc_ba);
     static Bool_t TypeD_PassesCuts(const TypeD &sexa, const KFVertex &kf_pv);
 
@@ -190,8 +190,8 @@ class Manager {
     void EndOfAnalysis(RNode df);
 
    private:
-    RNode FindSexaquarks_TypeA(RNode df, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products);
-    RNode FindSexaquarks_TypeD(RNode df, PdgCode struck_nucleon, const std::vector<PdgCode> &reaction_products);
+    RNode FindSexaquarks_TypeA(RNode df, PdgCode pdg_struck_nucleon, const std::vector<PdgCode> &pdg_reaction_products);
+    RNode FindSexaquarks_TypeD(RNode df, PdgCode pdg_struck_nucleon, const std::vector<PdgCode> &pdg_reaction_products);
 
     /* Containers */
     std::vector<std::string> fAnalyzed_V0sNames;
