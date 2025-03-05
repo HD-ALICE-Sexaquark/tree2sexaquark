@@ -6,8 +6,6 @@ using namespace Tree2Sexaquark;
 
 int main(int argc, char *argv[]) {
 
-    Logger *LoggerInstance = Logger::GetInstance();
-
     std::unique_ptr<Parser> ParserInstance =
         std::make_unique<Parser>("Tree2Sexaquark -- Read AnalysisResults.root and create Sexaquark Analysis Results!");
     ParserInstance->Parse(argc, argv);
@@ -50,8 +48,6 @@ int main(int argc, char *argv[]) {
     */
     // ThisAnalysis->PrintAll(DF_Main);       // DEBUG
     ThisAnalysis->EndOfAnalysis(DF_Main);
-
-    Logger::DeleteInstance();
 
     return 0;
 }

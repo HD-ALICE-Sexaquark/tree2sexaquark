@@ -38,6 +38,9 @@ message(STATUS "Looking for KFParticle")
 find_package(KFParticle CONFIG REQUIRED)
 if(KFParticle_FOUND)
   message(STATUS "Looking for KFParticle -- found")
+  message(STATUS "KFParticle_INCLUDE_DIR   = ${KFParticle_INCLUDE_DIR}")
+  message(STATUS "KFParticle_LIB_DIR       = ${KFParticle_LIB_DIR}")
+  message(STATUS "KFParticle_COMPILE_FLAGS = ${KFParticle_COMPILE_FLAGS}")
 endif()
 
 # main #

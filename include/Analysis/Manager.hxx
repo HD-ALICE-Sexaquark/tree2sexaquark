@@ -36,6 +36,9 @@ using XYZPoint = ROOT::Math::XYZPoint;
 #include "KFParticle.h"
 #include "KFVertex.h"
 
+class KFParticle;
+class KFVertex;
+
 namespace Tree2Sexaquark {
 
 enum PdgCode : Int_t {

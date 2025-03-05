@@ -12,6 +12,9 @@ using namespace ROOT::VecOps;
 using RVecF = ROOT::RVecF;
 using cRVecF = const ROOT::RVecF&;
 
+class KFParticle;
+class KFVertex;
+
 namespace Tree2Sexaquark::Math {
 
 KFParticle CreateKFParticle(Float_t px, Float_t py, Float_t pz, Float_t x, Float_t y, Float_t z,       //

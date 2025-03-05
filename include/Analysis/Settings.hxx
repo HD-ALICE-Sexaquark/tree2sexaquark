@@ -1,9 +1,8 @@
 #ifndef T2S_ANALYSIS_SETTINGS_HXX
 #define T2S_ANALYSIS_SETTINGS_HXX
 
+#include <iostream>
 #include <string>
-
-#include "Utilities/Logger.hxx"
 
 namespace Tree2Sexaquark::Analysis {
 
@@ -18,12 +17,12 @@ class Settings {
     static Settings& Instance();
 
     static void Print() {
-        InfoF("IsMC           = %i", IsMC);
-        InfoF("IsSignalMC     = %i", IsSignalMC);
-        InfoF("InputFile      = %s", PathInputFile.c_str());
-        InfoF("OutputFile     = %s", PathOutputFile.c_str());
-        InfoF("LimitToNEvents = %lu", LimitToNEvents);
-        InfoF("NThreads       = %u", NThreads);
+        std::cout << "IsMC           = " << IsMC << '\n';
+        std::cout << "IsSignalMC     = " << IsSignalMC << '\n';
+        std::cout << "InputFile      = " << PathInputFile << '\n';
+        std::cout << "OutputFile     = " << PathOutputFile << '\n';
+        std::cout << "LimitToNEvents = " << LimitToNEvents << '\n';
+        std::cout << "NThreads       = " << NThreads << '\n';
     }
     static std::string PathInputFile;
     static std::string PathOutputFile;

@@ -1119,7 +1119,7 @@ void Manager::PrintAll(RNode df) {
                    (*ev_track_issignal)[event_i][track_entry]);
         }
     }  // end of loop over events
-    InfoF("NRuns = %u", df.GetNRuns());
+    std::cout << "NRuns = " << df.GetNRuns() << '\n';
 }
 
 void Manager::EndOfAnalysis(RNode df) {
@@ -1172,9 +1172,9 @@ void Manager::EndOfAnalysis(RNode df) {
     }
     /* Write to disk */
     df.Snapshot("Events", Settings::PathOutputFile, column_list);
-    InfoF("TFile %s has been written", Settings::PathOutputFile.c_str());
+    std::cout << "TFile " << Settings::PathOutputFile << " has been written" << '\n';
     /* Print info */
-    InfoF("NRuns = %u", df.GetNRuns());
+    std::cout << "NRuns = " << df.GetNRuns() << '\n';
 }
 
 }  // namespace Tree2Sexaquark::Analysis
